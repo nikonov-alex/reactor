@@ -23,8 +23,7 @@ type Reactor<State> = {
     events?: Events<State>,
     emit?: EmitRecord<State>[]
 
-    wrapper: HTMLElement,
-    eventHandler: { (e: Event): void }
+    wrapper: HTMLElement
 }
 
 
@@ -54,20 +53,6 @@ const make = <T>( args: {
         emit: args.emit,
         wrapper: document.createElement( "div" )
     }
-    function eventHandler( event: Event ) {
-        //@ts-ignore
-        const record = reactor.events[event.type];
-        if ( !isGlobalEvent( record ) ) {
-            if ( [ "submit" ].includes( event.type ) ) {
-                event.preventDefault();
-            }
-            event.stopImmediatePropagation();
-        }
-
-        const handler = getHandler( record );
-        changeState( handler( reactor.state, event ) );
-    }
-    reactor.eventHandler = eventHandler;
     if ( args.id ) {
         reactor.wrapper.id = args.id;
     }
@@ -125,6 +110,20 @@ const make = <T>( args: {
     }
 
     if ( reactor.events ) {
+        function eventHandler( event: Event ) {
+            //@ts-ignore
+            const record = reactor.events[event.type];
+            if ( !isGlobalEvent( record ) ) {
+                if ( [ "submit" ].includes( event.type ) ) {
+                    event.preventDefault();
+                }
+                event.stopImmediatePropagation();
+            }
+
+            const handler = getHandler( record );
+            changeState( handler( reactor.state, event ) );
+        }
+
         Object.entries( reactor.events ).forEach( ([name, record]) => {
             const target = isGlobalEvent( record )
                 ? "window" === record.target
