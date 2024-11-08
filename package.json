@@ -1,6 +1,6 @@
 {
   "name": "@nikonov-alex/reactor",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Reactor",
   "main": "./index.js",
   "types": "./index.ts",
@@ -25,6 +25,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@nikonov-alex/functional-library": "^0.0.31",
     "morphdom": "^2.7.4"
   }
 }

@@ -1,152 +1,176 @@
 import morphdom from "morphdom";
+import { Constructs } from "@nikonov-alex/functional-library";
+const { local } = Constructs;
+
+
+
+type EventHandler<State> = { ( s: State, e: Event ): State };
+type Events<State> = { [name: string]: EventHandler<State> };
+type EventListener = { ( e: Event ): void };
+type EventSubscriptions<State> = {
+    local?: Events<State>,
+    window?: Events<State>,
+    document?: Events<State>
+}
+
+class HTMLReactor extends HTMLElement { };
+customElements.define( "reactor", HTMLReactor );
+
+type Reactor<State, Running extends boolean = boolean> = {
+    data: {
+        state: State,
+        root: HTMLElement
+    },
+    id: symbol,
+    viewport: HTMLReactor,
+    events?: EventSubscriptions<State>,
+    localListener: EventListener,
+    windowListener: EventListener,
+    documentListener: EventListener,
+    running: Running
+};
 
 
 type Render<State> = { ( s: State ): HTMLElement };
 
-type EventHandler<State> = { ( s: State, e: Event ): State };
-type LocalEventRecord<State> = EventHandler<State>;
-type GlobalEventRecord<State> = { handler: EventHandler<State>, target: "window" | "document" };
-type EventRecord<State> = LocalEventRecord<State> | GlobalEventRecord<State>;
-type Events<State> = { [name: string]: EventRecord<State> };
-
-type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
-type EventEmitter<State> = { ( s: State ): Event };
-type EmitRecord<State> = {
-    when: EmitPredicate<State>,
-    emit: EventEmitter<State>,
-    target?: "element" | "window"
-}
-
-type Reactor<State> = {
-    state: State,
+type Args<State> = {
+    initialState: State,
     render: Render<State>,
-    events?: Events<State>,
-    emit?: EmitRecord<State>[]
-
-    wrapper: HTMLElement
-}
-
-
-const state = <T>( reactor: Reactor<T> ): T =>
-    reactor.state;
-
-
-const isGlobalEvent = <State>( record: EventRecord<State> ): record is GlobalEventRecord<State> =>
-    typeof record !== "function";
-const getHandler = <State>( record: EventRecord<State> ): EventHandler<State> =>
-    isGlobalEvent( record ) ? record.handler : record;
-
-const make = <T>( args: {
-    initialState: T,
-    render: Render<T>,
-    events?: Events<T>,
-    emit?: EmitRecord<T>[],
-    redraw?: "refresh" | "merge",
-    id?: string,
-    className?: string,
-} ): Reactor<T> => {
-    //@ts-ignore
-    const reactor: Reactor<T> = {
-        state: args.initialState,
-        render: args.render,
-        events: args.events,
-        emit: args.emit,
-        wrapper: document.createElement( "div" )
-    }
-    if ( args.id ) {
-        reactor.wrapper.id = args.id;
-    }
-    if ( args.className ) {
-        reactor.wrapper.className = args.className;
-    }
-    let root = reactor.render( reactor.state );
-    reactor.wrapper.appendChild( root );
-    let deferredRedraw = false;
-
-    function maybeEmitEvents( oldState: T ) {
-        if ( reactor.emit ) {
-            for ( const record of reactor.emit ) {
-                if ( record.when( oldState, reactor.state ) ) {
-                    const target = "window" === record.target
-                        ? window
-                        : reactor.wrapper;
-                    target.dispatchEvent( record.emit( reactor.state ) );
-                }
-            }
-        }
-    }
-
-    function redraw() {
-        const rendered = reactor.render( reactor.state );
-        if ( root.isEqualNode( rendered ) ) {
-            return;
-        }
-        if ( args.redraw && "refresh" === args.redraw || root.nodeName !== rendered.nodeName ) {
-            root.replaceWith( rendered );
-            root = rendered;
-        }
-        else {
-            morphdom( root, rendered, {
-                onBeforeElUpdated: ( fromEl, toEl ) =>
-                    !fromEl.isEqualNode( toEl )
-            } );
-        }
-    }
-
-    function changeState( newState: T ) {
-        if ( reactor.state === newState ) {
-            return;
-        }
-        const oldState = reactor.state;
-        reactor.state = newState;
-        if ( !deferredRedraw ) {
-            setTimeout( () => {
-                redraw();
-                deferredRedraw = false;
-            }, 0 );
-            deferredRedraw = true;
-        }
-        maybeEmitEvents( oldState );
-    }
-
-    if ( reactor.events ) {
-        function eventHandler( event: Event ) {
-            //@ts-ignore
-            const record = reactor.events[event.type];
-            if ( !isGlobalEvent( record ) ) {
-                if ( [ "submit" ].includes( event.type ) ) {
-                    event.preventDefault();
-                }
-                event.stopImmediatePropagation();
-            }
-
-            const handler = getHandler( record );
-            changeState( handler( reactor.state, event ) );
-        }
-
-        Object.entries( reactor.events ).forEach( ([name, record]) => {
-            const target = isGlobalEvent( record )
-                ? "window" === record.target
-                    ? window
-                    : document
-                : reactor.wrapper;
-            target.addEventListener( name, eventHandler, true )
-        } );
-    }
-
-    return reactor;
+    events?: EventSubscriptions<State>,
+    styles?: CSSStyleSheet
 };
 
+const createViewport = ( args: {
+    root: HTMLElement,
+    styles?: CSSStyleSheet
+} ): HTMLElement => {
+    const viewport = document.createElement( "reactor" );
+    const shadowRoot = viewport.attachShadow( { mode: "open" } );
+    shadowRoot.appendChild( args.root );
+    if ( args.styles ) {
+        shadowRoot.adoptedStyleSheets.push( args.styles );
+    }
+    return viewport;
+};
 
-const run = <T>( props: { reactor: Reactor<T> } ): HTMLElement => {
-    props.reactor.wrapper.remove();
-    return props.reactor.wrapper;
+const make = <T>( args: Args<T> ): Reactor<T, false> =>
+    local( {
+        state: args.initialState,
+        root: args.render( args.initialState )
+    }, data =>
+    local( ( newState: T ) => {
+        if ( data.state !== newState ) {
+            data.state = newState;
+            const newRoot = args.render( data.state );
+            if ( !data.root.isEqualNode( newRoot ) ) {
+                if ( data.root.nodeName !== newRoot.nodeName ) {
+                    data.root.replaceWith( newRoot );
+                    data.root = newRoot;
+                }
+                else {
+                    morphdom( data.root, newRoot, {
+                        getNodeKey: node =>
+                            node instanceof HTMLReactor
+                                //@ts-ignore
+                                ? node.reactor : node.id,
+                        onBeforeNodeAdded: node =>
+                            node instanceof HTMLReactor &&
+                            node.classList.contains( "stub" )
+                                //@ts-ignore
+                                ? node.reference.deref()
+                                : node,
+                        onBeforeElUpdated: ( fromEl, toEl ) =>
+                            fromEl.isEqualNode( toEl )
+                                ? false
+                            : toEl instanceof HTMLReactor
+                                ? toEl.classList.contains( "viewport" )
+                                    ? toEl
+                                    //@ts-ignore
+                                    : toEl.reference.deref()
+                                : true
+                    } );
+                }
+            }
+        }
+    }, changeState =>
+    ( {
+        data,
+        id: Symbol( "id" ),
+        viewport: createViewport( {
+            root: data.root,
+            styles: args.styles
+        } ),
+        events: args.events,
+        localListener: ( event: Event ) => {
+            if ( [ "submit" ].includes( event.type ) ) {
+                event.preventDefault();
+            }
+            event.stopImmediatePropagation();
+            //@ts-ignore
+            const eventHandler = args.events.local[event.type];
+            changeState( eventHandler( data.state, event ) );
+        },
+        windowListener: ( event: Event ) => {
+            //@ts-ignore
+            const eventHandler = args.events.window[event.type];
+            changeState( eventHandler( data.state, event ) );
+        },
+        documentListener: ( event: Event ) => {
+            //@ts-ignore
+            const eventHandler = args.events.document[event.type];
+            changeState( eventHandler( data.state, event ) );
+        },
+        running: false
+    } )));
+
+const state = <T>( reactor: Reactor<T> ): T =>
+    reactor.data.state;
+
+const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
+    if ( !reactor.viewport.isConnected ) {
+        reactor.viewport.classList.add( "viewport" );
+        //@ts-ignore
+        reactor.viewport.reactor = reactor.id;
+        return reactor.viewport;
+    }
+    const stub = document.createElement( "reactor" );
+    stub.classList.add( "stub" );
+    //@ts-ignore
+    stub.reactor = reactor.id;
+    //@ts-ignore
+    stub.reference = new WeakRef( reactor.viewport );
+    return stub;
 }
 
-const stop = <T>( reactor: Reactor<T> ): Reactor<T> => {
-    reactor.wrapper.remove();
-    return reactor;
-}
 
+const bindEvents = <State>(
+    events: Events<State>,
+    target: EventTarget,
+    eventsHandler: { (e: Event): void }
+): void =>
+    Object.keys( events ).forEach( ( eventName ) =>
+            target.addEventListener( eventName, eventsHandler ));
 
-export { Reactor, make, state, run, stop };
+const start = <T>( reactor: Reactor<T, false> ): Reactor<T, true> => {
+    bindEvents( reactor.events?.local ?? { }, reactor.viewport, reactor.localListener );
+    bindEvents( reactor.events?.window ?? { }, window, reactor.windowListener );
+    bindEvents( reactor.events?.document ?? { }, document, reactor.documentListener );
+    return { ... reactor, running: true };
+};
+
+const unbindEvents = <State>(
+    events: Events<State>,
+    target: EventTarget,
+    eventsHandler: { (e: Event): void }
+): void =>
+    Object.keys( events ).forEach( ( eventName ) =>
+            target.removeEventListener( eventName, eventsHandler ));
+
+const pause = <T>( reactor: Reactor<T, true> ): Reactor<T, false> => {
+    unbindEvents( reactor.events?.local ?? { }, reactor.viewport, reactor.localListener );
+    unbindEvents( reactor.events?.window ?? { }, window, reactor.windowListener );
+    unbindEvents( reactor.events?.document ?? { }, document, reactor.documentListener );
+    return { ... reactor, running: false };
+};
+
+export { make, start, pause, state, viewport };
