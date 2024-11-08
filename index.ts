@@ -147,7 +147,7 @@ const bindEvents = <State>(
     eventsHandler: { (e: Event): void }
 ): void =>
     Object.keys( events ).forEach( ( eventName ) =>
-            target.addEventListener( eventName, eventsHandler ));
+            target.addEventListener( eventName, eventsHandler, true ));
 
 const start = <T>( reactor: Reactor<T, false> ): Reactor<T, true> => {
     bindEvents( reactor.events?.local ?? { }, reactor.shadowRoot, reactor.localListener );
@@ -162,7 +162,7 @@ const unbindEvents = <State>(
     eventsHandler: { (e: Event): void }
 ): void =>
     Object.keys( events ).forEach( ( eventName ) =>
-            target.removeEventListener( eventName, eventsHandler ));
+            target.removeEventListener( eventName, eventsHandler, true ));
 
 const pause = <T>( reactor: Reactor<T, true> ): Reactor<T, false> => {
     unbindEvents( reactor.events?.local ?? { }, reactor.shadowRoot, reactor.localListener );
