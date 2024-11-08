@@ -173,4 +173,4 @@ const pause = <T>( reactor: Reactor<T, true> ): Reactor<T, false> => {
     return { ... reactor, running: false };
 };
 
-export { make, start, pause, state, viewport };
+export { make, start, pause, state, viewport, Reactor as Type };
