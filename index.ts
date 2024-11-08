@@ -1,4 +1,5 @@
 import morphdom from "morphdom";
+import { v4 as uuidv4 } from 'uuid';
 import { Constructs } from "@nikonov-alex/functional-library";
 const { local } = Constructs;
 
@@ -21,7 +22,7 @@ type Reactor<State, Running extends boolean = boolean> = {
         state: State,
         root: HTMLElement
     },
-    id: symbol,
+    id: string,
     viewport: HTMLReactor,
     shadowRoot: ShadowRoot,
     events?: EventSubscriptions<State>,
@@ -71,7 +72,7 @@ const make = <T>( args: Args<T> ): Reactor<T, false> =>
                         getNodeKey: node =>
                             node instanceof HTMLReactor
                                 //@ts-ignore
-                                ? node.reactor : node.id,
+                                ? node.dataset.id : node.id,
                         onBeforeNodeAdded: node =>
                             node instanceof HTMLReactor &&
                             node.classList.contains( "stub" )
@@ -95,7 +96,7 @@ const make = <T>( args: Args<T> ): Reactor<T, false> =>
     local( document.createElement( "reactor-viewport" ),
     viewport => init( {
         data,
-        id: Symbol( "id" ),
+        id: uuidv4(),
         viewport,
         shadowRoot: viewport.attachShadow( { mode: "open" } ),
         events: args.events,
@@ -128,13 +129,13 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     if ( !reactor.viewport.isConnected ) {
         reactor.viewport.classList.add( "viewport" );
         //@ts-ignore
-        reactor.viewport.reactor = reactor.id;
+        reactor.viewport.dataset.id = reactor.id;
         return reactor.viewport;
     }
     const stub = document.createElement( "reactor-viewport" );
     stub.classList.add( "stub" );
     //@ts-ignore
-    stub.reactor = reactor.id;
+    stub.dataset.id = reactor.id;
     //@ts-ignore
     stub.reference = new WeakRef( reactor.viewport );
     return stub;

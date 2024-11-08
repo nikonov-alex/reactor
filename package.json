@@ -1,6 +1,6 @@
 {
   "name": "@nikonov-alex/reactor",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Reactor",
   "main": "./index.js",
   "types": "./index.ts",
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@nikonov-alex/functional-library": "^0.0.31",
-    "morphdom": "^2.7.4"
+    "morphdom": "^2.7.4",
+    "uuid": "^11.0.2"
   }
 }
