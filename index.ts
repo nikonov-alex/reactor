@@ -14,7 +14,7 @@ type EventSubscriptions<State> = {
 }
 
 class HTMLReactor extends HTMLElement { };
-customElements.define( "reactor", HTMLReactor );
+customElements.define( "reactor-viewport", HTMLReactor );
 
 type Reactor<State, Running extends boolean = boolean> = {
     data: {
@@ -44,7 +44,7 @@ const createViewport = ( args: {
     root: HTMLElement,
     styles?: CSSStyleSheet
 } ): HTMLElement => {
-    const viewport = document.createElement( "reactor" );
+    const viewport = document.createElement( "reactor-viewport" );
     const shadowRoot = viewport.attachShadow( { mode: "open" } );
     shadowRoot.appendChild( args.root );
     if ( args.styles ) {
@@ -133,7 +133,7 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
         reactor.viewport.reactor = reactor.id;
         return reactor.viewport;
     }
-    const stub = document.createElement( "reactor" );
+    const stub = document.createElement( "reactor-viewport" );
     stub.classList.add( "stub" );
     //@ts-ignore
     stub.reactor = reactor.id;
