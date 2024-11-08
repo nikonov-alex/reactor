@@ -23,6 +23,7 @@ type Reactor<State, Running extends boolean = boolean> = {
     },
     id: symbol,
     viewport: HTMLReactor,
+    shadowRoot: ShadowRoot,
     events?: EventSubscriptions<State>,
     localListener: EventListener,
     windowListener: EventListener,
@@ -40,17 +41,15 @@ type Args<State> = {
     styles?: CSSStyleSheet
 };
 
-const createViewport = ( args: {
-    root: HTMLElement,
-    styles?: CSSStyleSheet
-} ): HTMLElement => {
-    const viewport = document.createElement( "reactor-viewport" );
-    const shadowRoot = viewport.attachShadow( { mode: "open" } );
-    shadowRoot.appendChild( args.root );
+const init = <T>(
+    reactor: Reactor<T, false>,
+    args: Args<T>
+): Reactor<T, false> => {
+    reactor.shadowRoot.appendChild( reactor.data.root );
     if ( args.styles ) {
-        shadowRoot.adoptedStyleSheets.push( args.styles );
+        reactor.shadowRoot.adoptedStyleSheets.push( args.styles );
     }
-    return viewport;
+    return reactor;
 };
 
 const make = <T>( args: Args<T> ): Reactor<T, false> =>
@@ -93,13 +92,12 @@ const make = <T>( args: Args<T> ): Reactor<T, false> =>
             }
         }
     }, changeState =>
-    ( {
+    local( document.createElement( "reactor-viewport" ),
+    viewport => init( {
         data,
         id: Symbol( "id" ),
-        viewport: createViewport( {
-            root: data.root,
-            styles: args.styles
-        } ),
+        viewport,
+        shadowRoot: viewport.attachShadow( { mode: "open" } ),
         events: args.events,
         localListener: ( event: Event ) => {
             if ( [ "submit" ].includes( event.type ) ) {
@@ -121,7 +119,7 @@ const make = <T>( args: Args<T> ): Reactor<T, false> =>
             changeState( eventHandler( data.state, event ) );
         },
         running: false
-    } )));
+    }, args ))));
 
 const state = <T>( reactor: Reactor<T> ): T =>
     reactor.data.state;
@@ -152,7 +150,7 @@ const bindEvents = <State>(
             target.addEventListener( eventName, eventsHandler ));
 
 const start = <T>( reactor: Reactor<T, false> ): Reactor<T, true> => {
-    bindEvents( reactor.events?.local ?? { }, reactor.viewport, reactor.localListener );
+    bindEvents( reactor.events?.local ?? { }, reactor.shadowRoot, reactor.localListener );
     bindEvents( reactor.events?.window ?? { }, window, reactor.windowListener );
     bindEvents( reactor.events?.document ?? { }, document, reactor.documentListener );
     return { ... reactor, running: true };
@@ -167,7 +165,7 @@ const unbindEvents = <State>(
             target.removeEventListener( eventName, eventsHandler ));
 
 const pause = <T>( reactor: Reactor<T, true> ): Reactor<T, false> => {
-    unbindEvents( reactor.events?.local ?? { }, reactor.viewport, reactor.localListener );
+    unbindEvents( reactor.events?.local ?? { }, reactor.shadowRoot, reactor.localListener );
     unbindEvents( reactor.events?.window ?? { }, window, reactor.windowListener );
     unbindEvents( reactor.events?.document ?? { }, document, reactor.documentListener );
     return { ... reactor, running: false };
