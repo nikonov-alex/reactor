@@ -206,7 +206,7 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     //@ts-ignore
     if ( !reactor._viewport.isConnected ) {
         //@ts-ignore
-        return reactor.viewport;
+        return reactor._viewport;
     }
     const stub = document.createElement( "reactor-viewport" );
     stub.classList.add( "stub" );
