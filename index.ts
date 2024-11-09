@@ -66,9 +66,11 @@ class Reactor<State> {
             for ( const event in args.events ) {
                 if ( Object.hasOwn( args.events, event ) ) {
                     if ( typeof args.events[event] === "function" ) {
+                        //@ts-ignore
                         this._localEvents.set( event, args.events[event] );
                     }
                     else {
+                        //@ts-ignore
                         this._globalEvents.set( event, args.events[event].handler );
                     }
                 }
