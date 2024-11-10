@@ -24,7 +24,7 @@ type Args<State> = {
     debug?: boolean
 };
 
-class Reactor<State> {
+class Core<State> {
     private _id: string;
     private _state: State;
     private _render: Render<State>;
@@ -38,7 +38,7 @@ class Reactor<State> {
     
     private _deferredRedraw = false;
     
-    private constructor( args: Args<State> ) {
+    public constructor( args: Args<State> ) {
         this._id = uuidv4();
         this._state = args.initialState;
         this._render = args.render;
@@ -58,9 +58,6 @@ class Reactor<State> {
             this._shadowRoot.adoptedStyleSheets.push( args.styles );
         }
         this._debug = !!(args.debug);
-        
-        this._globalEventHandler = this._globalEventHandler.bind( this );
-        this._localEventHandler = this._localEventHandler.bind( this );
         
         if ( args.events ) {
             for ( const event in args.events ) {
@@ -84,6 +81,21 @@ class Reactor<State> {
                         ? record.emit
                         : [ record.emit ] ) );
             }
+        }
+        for ( const eventName of this._localEvents.keys() ) {
+            this._shadowRoot.addEventListener( eventName, this._localEventHandler, true )
+        }
+        for ( const eventName of this._globalEvents.keys() ) {
+            window.addEventListener( eventName, this._globalEventHandler, true )
+        }
+    }
+    
+    public destructor() {
+        for ( const eventName of this._localEvents.keys() ) {
+            this._shadowRoot.removeEventListener( eventName, this._localEventHandler, true )
+        }
+        for ( const eventName of this._globalEvents.keys() ) {
+            window.removeEventListener( eventName, this._globalEventHandler, true )
         }
     }
     
@@ -174,23 +186,19 @@ class Reactor<State> {
             console.log( "nikonov-components: transition from", oldState, "to", this._state );
         }
     }
+}
+
+const registry = new FinalizationRegistry( ( core: Core<any> ) => {
+    console.log( "nikonov-components gc:", core );
+    core.destructor();
+} );
+
+class Reactor<State> {
+    private _core: Core<State>;
     
-    private _start() {
-        for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.addEventListener( eventName, this._localEventHandler, true )
-        };
-        for ( const eventName of this._globalEvents.keys() ) {
-            window.addEventListener( eventName, this._globalEventHandler, true )
-        };
-    }
-    
-    private _stop() {
-        for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.removeEventListener( eventName, this._localEventHandler, true )
-        };
-        for ( const eventName of this._globalEvents.keys() ) {
-            window.removeEventListener( eventName, this._globalEventHandler, true )
-        };
+    private constructor( args: Args<State> ) {
+        this._core = new Core( args );
+        registry.register( this, this._core );
     }
 }
 
@@ -200,33 +208,21 @@ const make = <T>( args: Args<T> ): Reactor<T> =>
 
 const state = <T>( reactor: Reactor<T> ): T =>
     //@ts-ignore
-    reactor._state;
+    reactor._core._state;
 
 const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     //@ts-ignore
-    if ( !reactor._viewport.isConnected ) {
+    if ( !reactor._core._viewport.isConnected ) {
         //@ts-ignore
-        return reactor._viewport;
+        return reactor._core._viewport;
     }
     const stub = document.createElement( "reactor-viewport" );
     stub.classList.add( "stub" );
     //@ts-ignore
-    stub.dataset.id = reactor._id;
+    stub.dataset.id = reactor._core._id;
     //@ts-ignore
-    stub.reference = new WeakRef( reactor._viewport );
+    stub.reference = new WeakRef( reactor._core._viewport );
     return stub;
 }
 
-const start = <T>( reactor: Reactor<T> ): Reactor<T> => {
-    //@ts-ignore
-    reactor._start();
-    return reactor;
-};
-
-const stop = <T>( reactor: Reactor<T> ): Reactor<T> => {
-    //@ts-ignore
-    reactor._stop();
-    return reactor;
-};
-
-export { make, start, stop, state, viewport, Reactor as Type };
+export { make, state, viewport, Reactor as Type };
