@@ -194,7 +194,8 @@ class Core<State> {
 const registry = new FinalizationRegistry( ( core: Core<any> ) => {
     //@ts-ignore
     if ( core._debug ) {
-        console.log( "nikonov-components gc:", structuredClone( core ) );
+        //@ts-ignore
+        console.log( "nikonov-components gc:", core._id, structuredClone( core._state ) );
     }
     core.destructor();
 } );
