@@ -59,6 +59,9 @@ class Core<State> {
         }
         this._debug = !!(args.debug);
         
+        this._globalEventHandler = this._globalEventHandler.bind( this );
+        this._localEventHandler = this._localEventHandler.bind( this );
+        
         if ( args.events ) {
             for ( const event in args.events ) {
                 if ( Object.hasOwn( args.events, event ) ) {
