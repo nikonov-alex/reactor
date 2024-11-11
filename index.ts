@@ -23,7 +23,7 @@ type Args<State> = {
     events?: Events<State>,
     onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
-    cleanup?: {(): void},
+    cleanup?: {( s: State ): void},
     styles?: CSSStyleSheet,
     debug?: boolean
 };
@@ -41,7 +41,7 @@ class Core<State> {
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
-    private _cleanup?: {(): void};
+    private _cleanup?: {( s: State ): void};
     
     private _deferredRedraw = false;
     
@@ -226,7 +226,7 @@ const registry = new FinalizationRegistry( ( core: Core<any> ) => {
     //@ts-ignore
     if ( core._cleanup ) {
         //@ts-ignore
-        core._cleanup();
+        core._cleanup( core._state );
     }
 } );
 
