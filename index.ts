@@ -10,7 +10,9 @@ type Events<State> = { [name: string]: EventHandler<State> | {
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
 type EventEmitter<State> = { ( s: State ): Event };
-type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] }
+type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
+
+type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
 
 class HTMLReactor extends HTMLElement { };
 customElements.define( "reactor-viewport", HTMLReactor );
@@ -19,7 +21,7 @@ type Args<State> = {
     initialState: State,
     render: Render<State>,
     events?: Events<State>,
-    onResize?: { ( s: State, e: ResizeObserverEntry[] ): State },
+    onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
     styles?: CSSStyleSheet,
     debug?: boolean
@@ -37,6 +39,7 @@ class Core<State> {
     private _localEvents: Map<string, EventHandler<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
+    private _resizeUserHandler?: ResizeHandler<State>;
     
     private _deferredRedraw = false;
     
@@ -63,6 +66,7 @@ class Core<State> {
         
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
+        this._resizeHandler = this._resizeHandler.bind( this );
         
         if ( args.events ) {
             for ( const event in args.events ) {
@@ -95,9 +99,8 @@ class Core<State> {
         }
         
         if ( args.onResize ) {
-            this._resizeObserver = new ResizeObserver( ( entries: ResizeObserverEntry[] ) => {
-                this._changeState( args.onResize( this._state, entries ) );
-            } );
+            this._resizeUserHandler = args.onResize;
+            this._resizeObserver = new ResizeObserver( this._resizeHandler );
             this._resizeObserver.observe( this._viewport );
         }
     }
@@ -112,6 +115,13 @@ class Core<State> {
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
         }
+    }
+    
+    private _resizeHandler( entries: ResizeObserverEntry[] ) {
+        this._changeState(
+        //@ts-ignore
+        this._resizeUserHandler(
+        this._state, entries ) );
     }
     
     private _localEventHandler( event: Event ) {
