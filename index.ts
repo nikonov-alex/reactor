@@ -23,6 +23,7 @@ type Args<State> = {
     events?: Events<State>,
     onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
+    cleanup?: {(): void},
     styles?: CSSStyleSheet,
     debug?: boolean
 };
@@ -40,6 +41,7 @@ class Core<State> {
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
+    private _cleanup?: {(): void};
     
     private _deferredRedraw = false;
     
@@ -63,6 +65,7 @@ class Core<State> {
             this._shadowRoot.adoptedStyleSheets.push( args.styles );
         }
         this._debug = !!(args.debug);
+        this._cleanup = args.cleanup;
         
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
@@ -220,6 +223,11 @@ const registry = new FinalizationRegistry( ( core: Core<any> ) => {
         console.log( "nikonov-components gc:", core._id, JSON.parse( JSON.stringify( core._state )));
     }
     core.destructor();
+    //@ts-ignore
+    if ( core._cleanup ) {
+        //@ts-ignore
+        core._cleanup();
+    }
 } );
 
 class Reactor<State> {
