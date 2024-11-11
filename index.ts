@@ -19,6 +19,7 @@ type Args<State> = {
     initialState: State,
     render: Render<State>,
     events?: Events<State>,
+    onResize?: { ( s: State, e: ResizeObserverEntry[] ): State },
     emit?: EmitRecord<State>[],
     styles?: CSSStyleSheet,
     debug?: boolean
@@ -35,6 +36,7 @@ class Core<State> {
     private _globalEvents: Map<string, EventHandler<State>> = new Map();
     private _localEvents: Map<string, EventHandler<State>> = new Map();
     private _debug: boolean;
+    private _resizeObserver?: ResizeObserver;
     
     private _deferredRedraw = false;
     
@@ -91,6 +93,13 @@ class Core<State> {
         for ( const eventName of this._globalEvents.keys() ) {
             window.addEventListener( eventName, this._globalEventHandler, true )
         }
+        
+        if ( args.onResize ) {
+            this._resizeObserver = new ResizeObserver( ( entries: ResizeObserverEntry[] ) => {
+                this._changeState( args.onResize( this._state, entries ) );
+            } );
+            this._resizeObserver.observe( this._viewport );
+        }
     }
     
     public destructor() {
@@ -99,6 +108,9 @@ class Core<State> {
         }
         for ( const eventName of this._globalEvents.keys() ) {
             window.removeEventListener( eventName, this._globalEventHandler, true )
+        }
+        if ( this._resizeObserver ) {
+            this._resizeObserver.unobserve( this._viewport );
         }
     }
     
