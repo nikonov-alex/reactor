@@ -181,6 +181,7 @@ class Core<State> {
                         ? node.reference.deref()
                         : node
                 },
+                //@ts-ignore
                 onBeforeElUpdated: ( fromEl, toEl ) => {
                     if ( this._debug ) {
                         console.log(
@@ -189,14 +190,21 @@ class Core<State> {
                             toEl.cloneNode( true )
                         );
                     }
-                    return fromEl.isEqualNode( toEl )
-                        ? false
-                    : toEl instanceof HTMLReactor
-                        ? toEl.classList.contains( "viewport" )
-                            ? toEl
-                            //@ts-ignore
-                            : toEl.reference.deref()
-                        : true;
+                    if ( fromEl.isEqualNode( toEl ) ) {
+                        return false;
+                    }
+                    if ( !(toEl instanceof HTMLReactor) ) {
+                        return fromEl;
+                    }
+                    if ( toEl.dataset.id === fromEl.dataset.id ) {
+                        return false;
+                    }
+                    if ( toEl.classList.contains( "viewport" ) ) {
+                        return toEl;
+                    }
+                    //@ts-ignore
+                    fromEl.replaceWith( toEl.reference.deref() );
+                    return false;
                 }
             } );
         }
