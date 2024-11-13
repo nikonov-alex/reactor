@@ -168,21 +168,36 @@ class Core<State> {
                     node instanceof HTMLReactor
                         //@ts-ignore
                         ? node.dataset.id : node.id,
-                onBeforeNodeAdded: node =>
-                    node instanceof HTMLReactor &&
+                onBeforeNodeAdded: node => {
+                    if ( this._debug ) {
+                        console.log(
+                            "nikonov-components: element added",
+                            node.cloneNode( true )
+                        );
+                    }
+                    return node instanceof HTMLReactor &&
                     node.classList.contains( "stub" )
                         //@ts-ignore
                         ? node.reference.deref()
-                        : node,
-                onBeforeElUpdated: ( fromEl, toEl ) =>
-                    fromEl.isEqualNode( toEl )
+                        : node
+                },
+                onBeforeElUpdated: ( fromEl, toEl ) => {
+                    if ( this._debug ) {
+                        console.log(
+                            "nikonov-components: element update",
+                            fromEl.cloneNode( true ),
+                            toEl.cloneNode( true )
+                        );
+                    }
+                    return fromEl.isEqualNode( toEl )
                         ? false
                     : toEl instanceof HTMLReactor
                         ? toEl.classList.contains( "viewport" )
                             ? toEl
                             //@ts-ignore
                             : toEl.reference.deref()
-                        : true
+                        : true;
+                }
             } );
         }
     }
