@@ -24,6 +24,7 @@ type Args<State> = {
     onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
     styles?: CSSStyleSheet,
+    id?: string,
     debug?: boolean
 };
 
@@ -51,6 +52,9 @@ class Core<State> {
         this._viewport = document.createElement( "reactor-viewport" );
         this._viewport.classList.add( "viewport" );
         this._viewport.dataset.id = this._id;
+        if ( args.id ) {
+            this._viewport.id = args.id;
+        }
         this._shadowRoot = this._viewport.attachShadow( {
             mode: "closed",
             //@ts-ignore
