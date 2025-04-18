@@ -3,9 +3,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 type Render<State> = { ( s: State ): HTMLElement };
 type EventHandler<State> = { ( s: State, e: Event ): State };
+type EventHandlerRecord<State> = {
+    handler: EventHandler<State>,
+    options?: AddEventListenerOptions
+}
 type Events<State> = { [name: string]: EventHandler<State> | {
     handler: EventHandler<State>,
-    target: "window"
+    target?: "local" | "window",
+    options?: AddEventListenerOptions
 } };
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
@@ -36,8 +41,8 @@ class Core<State> {
     private _shadowRoot: ShadowRoot;
     private _root: HTMLElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
-    private _globalEvents: Map<string, EventHandler<State>> = new Map();
-    private _localEvents: Map<string, EventHandler<State>> = new Map();
+    private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
+    private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
@@ -77,11 +82,24 @@ class Core<State> {
                 if ( Object.hasOwn( args.events, event ) ) {
                     if ( typeof args.events[event] === "function" ) {
                         //@ts-ignore
-                        this._localEvents.set( event, args.events[event] );
+                        this._localEvents.set( event, {
+                            handler: args.events[event]
+                        } );
                     }
                     else {
-                        //@ts-ignore
-                        this._globalEvents.set( event, args.events[event].handler );
+                        if ( !Object.hasOwn( args.events[event], "target" ) || "local" === args.events[event].target ) {
+                            this._localEvents.set( event, {
+                                handler: args.events[event].handler,
+                                options: args.events[event].options
+                            } );
+                        }
+                        else {
+                            //@ts-ignore
+                            this._globalEvents.set(event, {
+                                handler: args.events[event].handler,
+                                options: args.events[event].options
+                            });
+                        }
                     }
                 }
             }
@@ -96,10 +114,10 @@ class Core<State> {
             }
         }
         for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.addEventListener( eventName, this._localEventHandler, true )
+            this._shadowRoot.addEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._globalEvents.keys() ) {
-            window.addEventListener( eventName, this._globalEventHandler, true )
+            window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         
         if ( args.onResize ) {
@@ -111,10 +129,10 @@ class Core<State> {
     
     public destructor() {
         for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.removeEventListener( eventName, this._localEventHandler, true )
+            this._shadowRoot.removeEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._globalEvents.keys() ) {
-            window.removeEventListener( eventName, this._globalEventHandler, true )
+            window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
@@ -138,7 +156,7 @@ class Core<State> {
         }
         event.stopImmediatePropagation();
 
-        const handler = this._localEvents.get(event.type) as EventHandler<State>;
+        const handler = this._localEvents.get(event.type)!.handler as EventHandler<State>;
         this._changeState( handler( this._state, event ) );
     }
 
@@ -146,7 +164,7 @@ class Core<State> {
         if ( this._debug ) {
             console.log( "nikonov-components: global event catch", event );
         }
-        const handler = this._globalEvents.get(event.type) as EventHandler<State>;
+        const handler = this._globalEvents.get(event.type)!.handler as EventHandler<State>;
         this._changeState( handler( this._state, event ) );
     }
     
