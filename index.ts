@@ -17,12 +17,13 @@ type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
 type EventEmitter<State> = { ( s: State ): Event };
 type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
 
+type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
 type RequestSettings<State> = RequestEmitter<State> | {
     request: RequestEmitter<State>,
     receive: { ( s: State, m: Response, text: string ): State }
 };
-type RequestRecord<State> = { when: EmitPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
+type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
 
 type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
 
@@ -49,7 +50,7 @@ class Core<State> {
     private _shadowRoot: ShadowRoot;
     private _root: HTMLElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
-    private _http: Map<EmitPredicate<State>, Set<RequestSettings<State>>> = new Map();
+    private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
@@ -142,6 +143,8 @@ class Core<State> {
             this._resizeObserver = new ResizeObserver( this._resizeHandler );
             this._resizeObserver.observe( this._viewport );
         }
+
+        this._sendRequests( null );
     }
     
     public destructor() {
@@ -255,7 +258,7 @@ class Core<State> {
         }
     }
 
-    private _sendRequests( oldState: State ) {
+    private _sendRequests( oldState: State | null ) {
         for ( let [when, settings] of this._http ) {
             if ( when( oldState, this._state ) ) {
                 for ( let record of settings ) {
