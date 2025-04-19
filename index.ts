@@ -19,10 +19,13 @@ type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State>
 
 type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
-type RequestSettings<State> = RequestEmitter<State> | {
+type RequestSettings<State> = RequestEmitter<State> | ({
     request: RequestEmitter<State>,
-    receive: { ( s: State, m: Response, text: string ): State }
-};
+
+} & (
+    { text: { ( s: State, response: string ): State } } |
+    { json: { ( s: State, response: Object ): State } }
+));
 type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
 
 type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
@@ -269,11 +272,20 @@ class Core<State> {
                     const promise = fetch( request );
                     if ( typeof record !== "function" ) {
                         promise.then( ( response: Response ) => {
-                            response.text().then( body =>
-                                this._changeState(
-                                    // @ts-ignore
-                                    record.receive( this._state, response, body ) )
-                            );
+                            if ( Object.hasOwn( record, "text" ) ) {
+                                response.text().then( body =>
+                                    this._changeState(
+                                        // @ts-ignore
+                                        record.text( this._state, body ) )
+                                );
+                            }
+                            else {
+                                response.json().then( body =>
+                                    this._changeState(
+                                        // @ts-ignore
+                                        record.json( this._state, body ) )
+                                );
+                            }
                         } );
                     }
                 }
