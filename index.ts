@@ -17,6 +17,13 @@ type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
 type EventEmitter<State> = { ( s: State ): Event };
 type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
 
+type RequestEmitter<State> = { ( s: State ): Request };
+type RequestSettings<State> = RequestEmitter<State> | {
+    request: RequestEmitter<State>,
+    receive: { ( s: State, m: Response, text: string ): State }
+};
+type RequestRecord<State> = { when: EmitPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
+
 type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
 
 class HTMLReactor extends HTMLElement { };
@@ -28,6 +35,7 @@ type Args<State> = {
     events?: Events<State>,
     onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
+    http?: RequestRecord<State>[],
     styles?: CSSStyleSheet,
     id?: string,
     debug?: boolean
@@ -41,12 +49,13 @@ class Core<State> {
     private _shadowRoot: ShadowRoot;
     private _root: HTMLElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
+    private _http: Map<EmitPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
-    
+
     private _deferredRedraw = false;
     
     public constructor( args: Args<State> ) {
@@ -111,6 +120,14 @@ class Core<State> {
                     Array.isArray( record.emit )
                         ? record.emit
                         : [ record.emit ] ) );
+            }
+        }
+        if ( args.http ) {
+            for ( const record of args.http ) {
+                this._http.set( record.when, new Set(
+                    Array.isArray( record.send )
+                        ? record.send
+                        : [ record.send ] ) );
             }
         }
         for ( const eventName of this._localEvents.keys() ) {
@@ -237,6 +254,29 @@ class Core<State> {
             }
         }
     }
+
+    private _sendRequests( oldState: State ) {
+        for ( let [when, settings] of this._http ) {
+            if ( when( oldState, this._state ) ) {
+                for ( let record of settings ) {
+                    const emitter = typeof record === "function"
+                        ? record
+                        : record.request;
+                    const request = emitter( this._state );
+                    const promise = fetch( request );
+                    if ( typeof record !== "function" ) {
+                        promise.then( ( response: Response ) => {
+                            response.text().then( body =>
+                                this._changeState(
+                                    // @ts-ignore
+                                    record.receive( this._state, response, body ) )
+                            );
+                        } );
+                    }
+                }
+            }
+        }
+    }
     
     private _changeState( newState: State ) {
         if ( this._state === newState ) {
@@ -252,6 +292,7 @@ class Core<State> {
             this._deferredRedraw = true;
         }
         this._emitEvents( oldState );
+        this._sendRequests( oldState );
         if ( this._debug ) {
             console.log( "nikonov-components: transition from", oldState, "to", this._state );
         }
