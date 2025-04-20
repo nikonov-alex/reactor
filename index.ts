@@ -30,8 +30,10 @@ type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettin
 
 type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
 
-class HTMLReactor extends HTMLElement { };
+class HTMLReactor extends HTMLElement { }
 customElements.define( "reactor-viewport", HTMLReactor );
+
+type DOMMode = "light" | "shadow";
 
 type Args<State> = {
     initialState: State,
@@ -42,7 +44,8 @@ type Args<State> = {
     http?: RequestRecord<State>[],
     styles?: CSSStyleSheet,
     id?: string,
-    debug?: boolean
+    debug?: boolean,
+    dommode?: DOMMode
 };
 
 class Core<State> {
@@ -50,7 +53,7 @@ class Core<State> {
     private _state: State;
     private _render: Render<State>;
     private _viewport: HTMLElement;
-    private _shadowRoot: ShadowRoot;
+    private _container: ShadowRoot | HTMLElement;
     private _root: HTMLElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
@@ -59,6 +62,7 @@ class Core<State> {
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
+    private _dommode: DOMMode;
 
     private _deferredRedraw = false;
     
@@ -73,16 +77,23 @@ class Core<State> {
         if ( args.id ) {
             this._viewport.id = args.id;
         }
-        this._shadowRoot = this._viewport.attachShadow( {
-            mode: "closed",
-            //@ts-ignore
-            clonable: true,
-            delegatesFocus: true
-        } );
+        this._dommode = args.dommode || "shadow";
+        this._container = "shadow" === this._dommode
+            ? this._viewport.attachShadow( {
+                mode: "closed",
+                //@ts-ignore
+                clonable: true,
+                delegatesFocus: true
+            } )
+            : this._viewport;
         this._root = this._render( this._state );
-        this._shadowRoot.appendChild( this._root );
+        this._container.appendChild( this._root );
         if ( args.styles ) {
-            this._shadowRoot.adoptedStyleSheets.push( args.styles );
+            if ( this._container instanceof ShadowRoot ) {
+                this._container.adoptedStyleSheets.push(args.styles);
+            } else {
+                document.adoptedStyleSheets.push( args.styles );
+            }
         }
         this._debug = !!(args.debug);
         
@@ -135,7 +146,7 @@ class Core<State> {
             }
         }
         for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.addEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
+            this._container.addEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._globalEvents.keys() ) {
             window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
@@ -152,7 +163,7 @@ class Core<State> {
     
     public destructor() {
         for ( const eventName of this._localEvents.keys() ) {
-            this._shadowRoot.removeEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
+            this._container.removeEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._globalEvents.keys() ) {
             window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
