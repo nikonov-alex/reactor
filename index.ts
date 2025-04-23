@@ -35,6 +35,13 @@ customElements.define( "reactor-viewport", HTMLReactor );
 
 type DOMMode = "light" | "shadow";
 
+type ValidateFunc<State> = { ( s: State ): [ValidityStateFlags, string] };
+type Validation<State> = {
+    validate: ValidateFunc<State>,
+    internals: ElementInternals,
+    formValue: { ( s: State ): string },
+};
+
 type Args<State> = {
     initialState: State,
     render: Render<State>,
@@ -45,7 +52,8 @@ type Args<State> = {
     styles?: CSSStyleSheet,
     id?: string,
     debug?: boolean,
-    dommode?: DOMMode
+    dommode?: DOMMode,
+    validation?: Validation<State>
 };
 
 class Core<State> {
@@ -63,6 +71,7 @@ class Core<State> {
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
     private _dommode: DOMMode;
+    private _validation?: Validation<State>;
 
     private _deferredRedraw = false;
     
@@ -159,6 +168,9 @@ class Core<State> {
         }
 
         this._sendRequests( null );
+
+        this._validation = args.validation;
+        this._maybeValidate();
     }
     
     public destructor() {
@@ -171,6 +183,30 @@ class Core<State> {
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
         }
+    }
+
+    private _maybeValidate() {
+        if ( this._validation ) {
+            const [ flags, message ] = this._validation.validate( this._state );
+            if ( this._validityDiffers( flags ) ) {
+                this._validation.internals.setValidity( flags, message, this._root );
+            }
+            this._validation.internals.setFormValue( this._validation.formValue( this._state ) );
+        }
+    }
+
+    private _validityDiffers( flags: ValidityStateFlags ) {
+        const validity = this._validation!.internals.validity;
+        return validity.valueMissing !== ( flags.valueMissing ?? false ) ||
+            validity.stepMismatch !== ( flags.stepMismatch ?? false ) ||
+            validity.badInput !== ( flags.badInput ?? false ) ||
+            validity.customError !== ( flags.customError ?? false ) ||
+            validity.patternMismatch !== ( flags.patternMismatch ?? false ) ||
+            validity.rangeOverflow !== ( flags.rangeOverflow ?? false ) ||
+            validity.rangeUnderflow !== ( flags.rangeUnderflow ?? false ) ||
+            validity.tooLong !== ( flags.tooLong ?? false ) ||
+            validity.tooShort !== ( flags.tooShort ?? false ) ||
+            validity.typeMismatch !== ( flags.typeMismatch ?? false );
     }
     
     private _resizeHandler( entries: ResizeObserverEntry[] ) {
@@ -319,6 +355,7 @@ class Core<State> {
         }
         this._emitEvents( oldState );
         this._sendRequests( oldState );
+        this._maybeValidate();
         if ( this._debug ) {
             console.log( "nikonov-components: transition from", oldState, "to", this._state );
         }
