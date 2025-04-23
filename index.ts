@@ -189,7 +189,7 @@ class Core<State> {
         if ( this._validation ) {
             const [ flags, message ] = this._validation.validate( this._state );
             if ( this._validityDiffers( flags ) ) {
-                this._validation.internals.setValidity( flags, message, this._root );
+                this._validation.internals.setValidity( flags, message );
             }
             this._validation.internals.setFormValue( this._validation.formValue( this._state ) );
         }
