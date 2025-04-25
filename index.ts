@@ -23,8 +23,8 @@ type RequestSettings<State> = RequestEmitter<State> | ({
     request: RequestEmitter<State>,
 
 } & (
-    { text: { ( s: State, response: string ): State } } |
-    { json: { ( s: State, response: Object ): State } }
+    { text: { ( s: State, response: string, request: Request ): State } } |
+    { json: { ( s: State, response: Object, request: Request ): State } }
 ));
 type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
 
@@ -323,14 +323,14 @@ class Core<State> {
                                 response.text().then( body =>
                                     this._changeState(
                                         // @ts-ignore
-                                        record.text( this._state, body ) )
+                                        record.text( this._state, body, request ) )
                                 );
                             }
                             else {
                                 response.json().then( body =>
                                     this._changeState(
                                         // @ts-ignore
-                                        record.json( this._state, body ) )
+                                        record.json( this._state, body, request ) )
                                 );
                             }
                         } );
