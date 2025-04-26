@@ -52,8 +52,9 @@ type Args<State> = {
     styles?: CSSStyleSheet,
     id?: string,
     debug?: boolean,
+    validation?: Validation<State>,
     dommode?: DOMMode,
-    validation?: Validation<State>
+    container?: HTMLElement
 };
 
 class Core<State> {
@@ -61,7 +62,7 @@ class Core<State> {
     private _state: State;
     private _render: Render<State>;
     private _viewport: HTMLElement;
-    private _container: ShadowRoot | HTMLElement;
+    private _container: HTMLElement;
     private _root: HTMLElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
@@ -87,7 +88,7 @@ class Core<State> {
             this._viewport.id = args.id;
         }
         this._dommode = args.dommode || "shadow";
-        this._container = "shadow" === this._dommode
+        const parent = "shadow" === this._dommode
             ? this._viewport.attachShadow( {
                 mode: "closed",
                 //@ts-ignore
@@ -95,11 +96,15 @@ class Core<State> {
                 delegatesFocus: true
             } )
             : this._viewport;
+        this._container = args.container
+            ? args.container
+            : document.createElement( "div" );
+        parent.appendChild( this._container );
         this._root = this._render( this._state );
         this._container.appendChild( this._root );
         if ( args.styles ) {
-            if ( this._container instanceof ShadowRoot ) {
-                this._container.adoptedStyleSheets.push(args.styles);
+           if ( parent instanceof ShadowRoot ) {
+               parent.adoptedStyleSheets.push(args.styles);
             } else {
                 document.adoptedStyleSheets.push( args.styles );
             }
