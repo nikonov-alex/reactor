@@ -113,6 +113,7 @@ class Core<State> {
         this._debug = !!(args.debug);
         
         this._globalEventHandler = this._globalEventHandler.bind( this );
+        this._documentEventHandler = this._documentEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
         this._resizeHandler = this._resizeHandler.bind( this );
         
@@ -173,7 +174,7 @@ class Core<State> {
             window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._documentEvents.keys() ) {
-            this._container.ownerDocument.addEventListener( eventName, this._globalEventHandler, this._documentEvents.get( eventName )!.options || true )
+            this._container.ownerDocument.addEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
         }
         
         if ( args.onResize ) {
@@ -196,7 +197,7 @@ class Core<State> {
             window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._documentEvents.keys() ) {
-            this._container.ownerDocument.removeEventListener( eventName, this._globalEventHandler, this._documentEvents.get( eventName )!.options || true )
+            this._container.ownerDocument.removeEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
@@ -253,6 +254,14 @@ class Core<State> {
             console.log( "nikonov-components: global event catch", event );
         }
         const handler = this._globalEvents.get(event.type)!.handler as EventHandler<State>;
+        this._changeState( handler( this._state, event ) );
+    }
+
+    private _documentEventHandler( event: Event ) {
+        if ( this._debug ) {
+            console.log( "nikonov-components: document event catch", event );
+        }
+        const handler = this._documentEvents.get(event.type)!.handler as EventHandler<State>;
         this._changeState( handler( this._state, event ) );
     }
     
