@@ -173,7 +173,7 @@ class Core<State> {
             window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._documentEvents.keys() ) {
-            this._container.ownerDocument.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
+            this._container.ownerDocument.addEventListener( eventName, this._globalEventHandler, this._documentEvents.get( eventName )!.options || true )
         }
         
         if ( args.onResize ) {
@@ -196,7 +196,7 @@ class Core<State> {
             window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._documentEvents.keys() ) {
-            this._container.ownerDocument.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
+            this._container.ownerDocument.removeEventListener( eventName, this._globalEventHandler, this._documentEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
