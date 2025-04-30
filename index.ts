@@ -9,7 +9,7 @@ type EventHandlerRecord<State> = {
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
     handler: EventHandler<State>,
-    target?: "local" | "window",
+    target?: "local" | "window" | "document",
     options?: AddEventListenerOptions
 } };
 
@@ -68,6 +68,7 @@ class Core<State> {
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
+    private _documentEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
@@ -131,9 +132,15 @@ class Core<State> {
                                 options: args.events[event].options
                             } );
                         }
-                        else {
+                        else if ( "window" === args.events[event].target ) {
                             //@ts-ignore
                             this._globalEvents.set(event, {
+                                handler: args.events[event].handler,
+                                options: args.events[event].options
+                            });
+                        }
+                        else {
+                            this._documentEvents.set(event, {
                                 handler: args.events[event].handler,
                                 options: args.events[event].options
                             });
@@ -165,6 +172,9 @@ class Core<State> {
         for ( const eventName of this._globalEvents.keys() ) {
             window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
+        for ( const eventName of this._documentEvents.keys() ) {
+            this._container.ownerDocument.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
+        }
         
         if ( args.onResize ) {
             this._resizeUserHandler = args.onResize;
@@ -184,6 +194,9 @@ class Core<State> {
         }
         for ( const eventName of this._globalEvents.keys() ) {
             window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
+        }
+        for ( const eventName of this._documentEvents.keys() ) {
+            this._container.ownerDocument.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
