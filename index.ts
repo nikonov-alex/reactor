@@ -347,6 +347,7 @@ class Core<State> {
         for ( let i = 0; i < retry; i++ ) {
             try {
                 response = await fetch( request );
+                break;
             }
             catch ( error ) {
                 if ( i < retry - 1 ) {
