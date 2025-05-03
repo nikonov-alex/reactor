@@ -19,13 +19,14 @@ type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State>
 
 type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
-type RequestSettings<State> = RequestEmitter<State> | ({
+type RequestResponse<State> = {
     request: RequestEmitter<State>,
-
+    error: { ( s: State, error: Error ): State }
 } & (
-    { text: { ( s: State, response: string, request: Request ): State } } |
-    { json: { ( s: State, response: Object, request: Request ): State } }
-));
+    { text: { ( s: State, response: Response, body: string ): State } } |
+    { json: { ( s: State, response: Response, body: Object ): State } }
+);
+type RequestSettings<State> = RequestEmitter<State> | RequestResponse<State>;
 type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
 
 type ResizeHandler<State> = { ( s: State, e: ResizeObserverEntry[] ): State };
@@ -335,32 +336,37 @@ class Core<State> {
         }
     }
 
+    private async _requestResponse( settings: RequestResponse<State> ) {
+        const request = settings.request( this._state );
+        try {
+            const response = await fetch( request );
+            if ( !response.ok ) {
+                throw new Error( response.statusText );
+            }
+
+            if ( "text" in settings ) {
+                const body = await response.text();
+                this._changeState(settings.text( this._state, response, body ));
+            }
+            else {
+                const body = await response.json();
+                this._changeState(settings.json( this._state, response, body ));
+            }
+        }
+        catch ( error ) {
+            this._changeState( settings.error( this._state, error as Error ) );
+        }
+    }
+
     private _sendRequests( oldState: State | null ) {
         for ( let [when, settings] of this._http ) {
             if ( when( oldState, this._state ) ) {
                 for ( let record of settings ) {
-                    const emitter = typeof record === "function"
-                        ? record
-                        : record.request;
-                    const request = emitter( this._state );
-                    const promise = fetch( request );
-                    if ( typeof record !== "function" ) {
-                        promise.then( ( response: Response ) => {
-                            if ( Object.hasOwn( record, "text" ) ) {
-                                response.text().then( body =>
-                                    this._changeState(
-                                        // @ts-ignore
-                                        record.text( this._state, body, request ) )
-                                );
-                            }
-                            else {
-                                response.json().then( body =>
-                                    this._changeState(
-                                        // @ts-ignore
-                                        record.json( this._state, body, request ) )
-                                );
-                            }
-                        } );
+                    if ( typeof record === "function" ) {
+                        fetch( record( this._state ) )
+                    }
+                    else {
+                        this._requestResponse( record );
                     }
                 }
             }
