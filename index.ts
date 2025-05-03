@@ -21,11 +21,10 @@ type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
 type RequestResponse<State> = {
     request: RequestEmitter<State>,
-    error: { ( s: State, error: Error ): State }
-} & (
-    { text: { ( s: State, response: Response, body: string ): State } } |
-    { json: { ( s: State, response: Response, body: Object ): State } }
-);
+    response?: { ( s: State, response: Response, body: string ): State },
+    error?: { ( s: State, error: Error ): State },
+    retry?: number
+};
 type RequestSettings<State> = RequestEmitter<State> | RequestResponse<State>;
 type RequestRecord<State> = { when: RequestPredicate<State>, send: RequestSettings<State> | RequestSettings<State>[] };
 
@@ -336,39 +335,56 @@ class Core<State> {
         }
     }
 
-    private async _requestResponse( settings: RequestResponse<State> ) {
-        const request = settings.request( this._state );
-        try {
-            const response = await fetch( request );
-            if ( !response.ok ) {
-                throw new Error( response.statusText );
+    private async _sendRequest( record: RequestSettings<State> ) {
+        const emitter = typeof record === "function"
+            ? record
+            : record.request;
+        const request = emitter( this._state );
+        const retry = "retry" in record && !!record.retry
+            ? record.retry
+            : 1;
+        let response: Response | null = null;
+        for ( let i = 0; i < retry; i++ ) {
+            try {
+                response = await fetch( request );
             }
-
-            if ( "text" in settings ) {
-                const body = await response.text();
-                this._changeState(settings.text( this._state, response, body ));
-            }
-            else {
-                const body = await response.json();
-                this._changeState(settings.json( this._state, response, body ));
+            catch ( error ) {
+                if ( i < retry - 1 ) {
+                    continue;
+                }
+                else if ( "error" in record && !!record.error ) {
+                    this._changeState( record.error( this._state, error as Error ) );
+                }
+                return;
             }
         }
-        catch ( error ) {
-            this._changeState( settings.error( this._state, error as Error ) );
+        if ( "response" in record && !!record.response || "error" in record && !!record.error ) {
+            response = response as Response;
+            let body: string = "";
+            try {
+                if ( !response.ok ) {
+                    throw new Error( response.statusText );
+                }
+                body = await response.text();
+            }
+            catch ( error ) {
+                if ( "error" in record && !!record.error ) {
+                    this._changeState( record.error( this._state, error as Error ) );
+                }
+                return;
+            }
+            if ( "response" in record && !!record.response ) {
+                this._changeState(record.response( this._state, response, body ));
+            }
         }
     }
 
     private _sendRequests( oldState: State | null ) {
         for ( let [when, settings] of this._http ) {
             if ( when( oldState, this._state ) ) {
-                for ( let record of settings ) {
-                    if ( typeof record === "function" ) {
-                        fetch( record( this._state ) )
-                    }
-                    else {
-                        this._requestResponse( record );
-                    }
-                }
+                settings.forEach( record => {
+                    this._sendRequest( record );
+                } );
             }
         }
     }
