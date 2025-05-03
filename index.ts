@@ -14,7 +14,7 @@ type Events<State> = { [name: string]: EventHandler<State> | {
 } };
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
-type EventEmitter<State> = { ( s: State ): Event };
+type EventEmitter<State> = { ( s: State, os: State ): Event };
 type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
 
 type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
@@ -329,7 +329,7 @@ class Core<State> {
         for ( let [when, emitters] of this._emit ) {
             if ( when( oldState, this._state ) ) {
                 for ( let emitter of emitters ) {
-                    this._viewport.dispatchEvent( emitter( this._state ) );
+                    this._viewport.dispatchEvent( emitter( this._state, oldState ) );
                 }
             }
         }
