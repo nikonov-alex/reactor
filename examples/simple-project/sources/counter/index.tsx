@@ -23,7 +23,7 @@ const render = ( state: State ): HTMLElement =>
 
 
 
-const increment = ( state: State, event: Event ): State =>
+const maybeIncrement = ( state: State, event: Event ): State =>
     "increment" === (event.target as HTMLElement).id
         ? state + 1
         : state;
@@ -36,7 +36,7 @@ const make = (): Reactor.Type<State> =>
         initialState: 1,
         render,
         events: {
-            click: increment
+            click: maybeIncrement
         },
         styles: stylesheet
     } );
