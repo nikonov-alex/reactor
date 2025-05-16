@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "outDir": "./app/",
+    "skipLibCheck": true,
+    "module": "es6",
+    "moduleResolution": "node",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "target": "es6",
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "downlevelIteration": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx-dom",
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "baseUrl": "./",
+  },
+  "include": [ "sources/global.d.ts" ],
+  "files": [
+    "./sources/index.js",
+  ]
+}
