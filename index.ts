@@ -453,4 +453,11 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     return stub;
 }
 
-export { make, state, viewport, Reactor as Type, Args };
+const send = <T>( reactor: Reactor<T>, event: Event ): Reactor<T> => {
+    //@ts-ignore
+    reactor._core._container.dispatchEvent( event );
+    return reactor;
+}
+
+
+export { make, state, viewport, send, Reactor as Type, Args };
