@@ -453,4 +453,4 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     return stub;
 }
 
-export { make, state, viewport, Reactor as Type };
+export { make, state, viewport, Reactor as Type, Args };
