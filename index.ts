@@ -9,7 +9,7 @@ type EventHandlerRecord<State> = {
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
     handler: EventHandler<State>,
-    target?: "local" | "window" | "document",
+    target?: "local" | "window" | "document" | Reactor<any>,
     options?: AddEventListenerOptions
 } };
 
@@ -120,30 +120,39 @@ class Core<State> {
         if ( args.events ) {
             for ( const event in args.events ) {
                 if ( Object.hasOwn( args.events, event ) ) {
-                    if ( typeof args.events[event] === "function" ) {
+                    const eventData = args.events[event];
+                    if ( typeof eventData === "function" ) {
                         //@ts-ignore
                         this._localEvents.set( event, {
-                            handler: args.events[event]
+                            handler: eventData
                         } );
                     }
                     else {
-                        if ( !Object.hasOwn( args.events[event], "target" ) || "local" === args.events[event].target ) {
+                        if ( !Object.hasOwn( eventData, "target" ) || "local" === eventData.target ) {
                             this._localEvents.set( event, {
-                                handler: args.events[event].handler,
-                                options: args.events[event].options
+                                handler: eventData.handler,
+                                options: eventData.options
                             } );
                         }
-                        else if ( "window" === args.events[event].target ) {
+                        else if ( "window" === eventData.target ) {
                             //@ts-ignore
                             this._globalEvents.set(event, {
-                                handler: args.events[event].handler,
-                                options: args.events[event].options
+                                handler: eventData.handler,
+                                options: eventData.options
+                            });
+                        }
+                        else if ( eventData.target instanceof Reactor ) {
+                            //@ts-ignore
+                            const reactorID = eventData.target._core._id;
+                            this._globalEvents.set( `${reactorID}-${event}`, {
+                                handler: eventData.handler,
+                                options: eventData.options
                             });
                         }
                         else {
                             this._documentEvents.set(event, {
-                                handler: args.events[event].handler,
-                                options: args.events[event].options
+                                handler: eventData.handler,
+                                options: eventData.options
                             });
                         }
                     }
@@ -329,7 +338,12 @@ class Core<State> {
         for ( let [when, emitters] of this._emit ) {
             if ( when( oldState, this._state ) ) {
                 for ( let emitter of emitters ) {
-                    this._viewport.dispatchEvent( emitter( this._state, oldState ) );
+                    const event = emitter( this._state, oldState );
+                    this._viewport.dispatchEvent( event );
+
+                    //@ts-ignore
+                    const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
+                    window.dispatchEvent( reactorEvent );
                 }
             }
         }
