@@ -5,17 +5,24 @@ type Render<State> = { ( s: State ): HTMLElement };
 type EventHandler<State> = { ( s: State, e: Event ): State };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
-    options?: AddEventListenerOptions
+    options?: AddEventListenerOptions,
+    target?: EventTarget
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
     handler: EventHandler<State>,
-    target?: "local" | "window" | "document" | Reactor<any>,
+    target?: "local" | "window" | "document" | Reactor<any> | EventTarget,
     options?: AddEventListenerOptions
 } };
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
 type EventEmitter<State> = { ( s: State, os: State ): Event };
-type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
+type EmitData<State> = {
+    emit: EventEmitter<State>,
+    target?: EventTarget
+};
+type EmitRecord<State> = EmitData<State> & {
+    when: EmitPredicate<State>
+};
 
 type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
@@ -64,11 +71,12 @@ class Core<State> {
     private _viewport: HTMLElement;
     private _container: HTMLElement;
     private _root: HTMLElement;
-    private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
+    private _emit: Map<EmitPredicate<State>, EmitData<State>> = new Map();
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _documentEvents: Map<string, EventHandlerRecord<State>> = new Map();
+    private _targetEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
@@ -115,6 +123,7 @@ class Core<State> {
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._documentEventHandler = this._documentEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
+        this._targetEventHandler = this._targetEventHandler.bind( this );
         this._resizeHandler = this._resizeHandler.bind( this );
         
         if ( args.events ) {
@@ -149,6 +158,13 @@ class Core<State> {
                                 options: eventData.options
                             });
                         }
+                        else if ( eventData.target instanceof EventTarget ) {
+                            this._targetEvents.set( event, {
+                                handler: eventData.handler,
+                                options: eventData.options,
+                                target: eventData.target
+                            } );
+                        }
                         else {
                             this._documentEvents.set(event, {
                                 handler: eventData.handler,
@@ -162,10 +178,7 @@ class Core<State> {
         
         if ( args.emit ) {
             for ( const record of args.emit ) {
-                this._emit.set( record.when, new Set(
-                    Array.isArray( record.emit )
-                        ? record.emit
-                        : [ record.emit ] ) );
+                this._emit.set( record.when, record );
             }
         }
         if ( args.http ) {
@@ -184,6 +197,9 @@ class Core<State> {
         }
         for ( const eventName of this._documentEvents.keys() ) {
             this._container.ownerDocument.addEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
+        }
+        for ( const eventName of this._targetEvents.keys() ) {
+            this._targetEvents.get( eventName )!.target!.addEventListener( eventName, this._targetEventHandler, this._targetEvents.get( eventName )!.options || true )
         }
         
         if ( args.onResize ) {
@@ -207,6 +223,9 @@ class Core<State> {
         }
         for ( const eventName of this._documentEvents.keys() ) {
             this._container.ownerDocument.removeEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
+        }
+        for ( const eventName of this._documentEvents.keys() ) {
+            this._targetEvents.get( eventName )!.target!.removeEventListener( eventName, this._targetEventHandler, this._targetEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
@@ -255,6 +274,20 @@ class Core<State> {
         event.stopImmediatePropagation();
 
         const handler = this._localEvents.get(event.type)!.handler as EventHandler<State>;
+        this._changeState( handler( this._state, event ) );
+    }
+
+    private _targetEventHandler( event: Event ) {
+        if ( this._debug ) {
+            console.log( "nikonov-components: local event catch", event );
+        }
+
+        if ( [ "submit" ].includes( event.type ) ) {
+            event.preventDefault();
+        }
+        event.stopImmediatePropagation();
+
+        const handler = this._targetEvents.get(event.type)!.handler as EventHandler<State>;
         this._changeState( handler( this._state, event ) );
     }
 
@@ -335,16 +368,15 @@ class Core<State> {
     }
 
     private _emitEvents( oldState: State ) {
-        for ( let [when, emitters] of this._emit ) {
+        for ( let [when, emitData] of this._emit ) {
             if ( when( oldState, this._state ) ) {
-                for ( let emitter of emitters ) {
-                    const event = emitter( this._state, oldState );
-                    this._viewport.dispatchEvent( event );
+                const event = emitData.emit( this._state, oldState );
+                const target = emitData.target ?? this._viewport;
+                target.dispatchEvent( event );
 
-                    //@ts-ignore
-                    const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
-                    window.dispatchEvent( reactorEvent );
-                }
+                //@ts-ignore
+                const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
+                window.dispatchEvent( reactorEvent );
             }
         }
     }
