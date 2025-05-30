@@ -83,9 +83,13 @@ class Core<State> {
     private _dommode: DOMMode;
     private _validation?: Validation<State>;
 
+    private _args: Args<State>;
+
     private _deferredRedraw = false;
     
     public constructor( args: Args<State> ) {
+        this._args = args;
+
         this._id = uuidv4();
         this._state = args.initialState;
         this._render = args.render;
@@ -505,5 +509,12 @@ const send = <T>( reactor: Reactor<T>, event: Event ): Reactor<T> => {
     return reactor;
 }
 
+const clone = <T>( reactor: Reactor<T> ): Reactor<T> =>
+    make(
+        //@ts-ignore
+        reactor._core._args
+    );
 
-export { make, state, viewport, send, Reactor as Type, Args };
+
+
+export { make, state, viewport, send, Reactor as Type, Args, clone };
