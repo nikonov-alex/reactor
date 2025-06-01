@@ -2,7 +2,7 @@ import morphdom from "morphdom";
 import { v4 as uuidv4 } from 'uuid';
 
 type Render<State> = { ( s: State ): HTMLElement };
-type EventHandler<State> = { ( s: State, e: Event ): State };
+type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
     options?: AddEventListenerOptions,
@@ -266,6 +266,17 @@ class Core<State> {
         this._resizeUserHandler(
         this._state, entries ) );
     }
+
+    private _handleEvent( event: Event, handler: EventHandler<State> ) {
+        const result = handler( this._state, event );
+        if ( Array.isArray( result ) && 2 === result.length && result[1] instanceof Event ) {
+            this._changeState( result[0] );
+            this._dispatchEvent( result[1] );
+        }
+        else {
+            this._changeState( result as State );
+        }
+    }
     
     private _localEventHandler( event: Event ) {
         if ( this._debug ) {
@@ -277,8 +288,10 @@ class Core<State> {
         }
         event.stopImmediatePropagation();
 
-        const handler = this._localEvents.get(event.type)!.handler as EventHandler<State>;
-        this._changeState( handler( this._state, event ) );
+        this._handleEvent(
+            event,
+            this._localEvents.get(event.type)!.handler as EventHandler<State>
+        );
     }
 
     private _targetEventHandler( event: Event ) {
@@ -291,24 +304,30 @@ class Core<State> {
         }
         event.stopImmediatePropagation();
 
-        const handler = this._targetEvents.get(event.type)!.handler as EventHandler<State>;
-        this._changeState( handler( this._state, event ) );
+        this._handleEvent(
+            event,
+            this._targetEvents.get(event.type)!.handler as EventHandler<State>
+        );
     }
 
     private _globalEventHandler( event: Event ) {
         if ( this._debug ) {
             console.log( "nikonov-components: global event catch", event );
         }
-        const handler = this._globalEvents.get(event.type)!.handler as EventHandler<State>;
-        this._changeState( handler( this._state, event ) );
+        this._handleEvent(
+            event,
+            this._globalEvents.get(event.type)!.handler as EventHandler<State>
+        );
     }
 
     private _documentEventHandler( event: Event ) {
         if ( this._debug ) {
             console.log( "nikonov-components: document event catch", event );
         }
-        const handler = this._documentEvents.get(event.type)!.handler as EventHandler<State>;
-        this._changeState( handler( this._state, event ) );
+        this._handleEvent(
+            event,
+            this._documentEvents.get(event.type)!.handler as EventHandler<State>
+        );
     }
     
     private _redraw() {
@@ -371,16 +390,22 @@ class Core<State> {
         }
     }
 
+    private _dispatchEvent( event: Event, target?: EventTarget ) {
+        target = target ?? this._viewport;
+        target.dispatchEvent( event );
+
+        //@ts-ignore
+        const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
+        window.dispatchEvent( reactorEvent );
+    }
+
     private _emitEvents( oldState: State ) {
         for ( let [when, emitData] of this._emit ) {
             if ( when( oldState, this._state ) ) {
-                const event = emitData.emit( this._state, oldState );
-                const target = emitData.target ?? this._viewport;
-                target.dispatchEvent( event );
-
-                //@ts-ignore
-                const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
-                window.dispatchEvent( reactorEvent );
+                this._dispatchEvent(
+                    emitData.emit( this._state, oldState ),
+                    emitData.target
+                );
             }
         }
     }
