@@ -2,27 +2,20 @@ import morphdom from "morphdom";
 import { v4 as uuidv4 } from 'uuid';
 
 type Render<State> = { ( s: State ): HTMLElement };
-type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] };
+type EventHandler<State> = { ( s: State, e: Event ): State };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
-    options?: AddEventListenerOptions,
-    target?: EventTarget
+    options?: AddEventListenerOptions
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
-    handler: EventHandler<State>,
-    target?: "local" | "window" | "document" | Reactor<any> | EventTarget,
-    options?: AddEventListenerOptions
-} };
+        handler: EventHandler<State>,
+        target?: "local" | "window" | "document",
+        options?: AddEventListenerOptions
+    } };
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
 type EventEmitter<State> = { ( s: State, os: State ): Event };
-type EmitData<State> = {
-    emit: EventEmitter<State>,
-    target?: EventTarget
-};
-type EmitRecord<State> = EmitData<State> & {
-    when: EmitPredicate<State>
-};
+type EmitRecord<State> = { when: EmitPredicate<State>, emit: EventEmitter<State> | EventEmitter<State>[] };
 
 type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
@@ -71,29 +64,24 @@ class Core<State> {
     private _viewport: HTMLElement;
     private _container: HTMLElement;
     private _root: HTMLElement;
-    private _emit: Map<EmitPredicate<State>, EmitData<State>> = new Map();
+    private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _documentEvents: Map<string, EventHandlerRecord<State>> = new Map();
-    private _targetEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
     private _resizeUserHandler?: ResizeHandler<State>;
     private _dommode: DOMMode;
     private _validation?: Validation<State>;
 
-    private _args: Args<State>;
-
     private _deferredRedraw = false;
-    
-    public constructor( args: Args<State> ) {
-        this._args = args;
 
+    public constructor( args: Args<State> ) {
         this._id = uuidv4();
         this._state = args.initialState;
         this._render = args.render;
-        
+
         this._viewport = document.createElement( "reactor-viewport" );
         this._viewport.classList.add( "viewport" );
         this._viewport.dataset.id = this._id;
@@ -116,20 +104,19 @@ class Core<State> {
         this._root = this._render( this._state );
         this._container.appendChild( this._root );
         if ( args.styles ) {
-           if ( parent instanceof ShadowRoot ) {
-               parent.adoptedStyleSheets.push(args.styles);
+            if ( parent instanceof ShadowRoot ) {
+                parent.adoptedStyleSheets.push(args.styles);
             } else {
                 document.adoptedStyleSheets.push( args.styles );
             }
         }
         this._debug = !!(args.debug);
-        
+
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._documentEventHandler = this._documentEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
-        this._targetEventHandler = this._targetEventHandler.bind( this );
         this._resizeHandler = this._resizeHandler.bind( this );
-        
+
         if ( args.events ) {
             for ( const event in args.events ) {
                 if ( Object.hasOwn( args.events, event ) ) {
@@ -154,21 +141,6 @@ class Core<State> {
                                 options: eventData.options
                             });
                         }
-                        else if ( eventData.target instanceof Reactor ) {
-                            //@ts-ignore
-                            const reactorID = eventData.target._core._id;
-                            this._globalEvents.set( `${reactorID}-${event}`, {
-                                handler: eventData.handler,
-                                options: eventData.options
-                            });
-                        }
-                        else if ( eventData.target instanceof EventTarget ) {
-                            this._targetEvents.set( event, {
-                                handler: eventData.handler,
-                                options: eventData.options,
-                                target: eventData.target
-                            } );
-                        }
                         else {
                             this._documentEvents.set(event, {
                                 handler: eventData.handler,
@@ -179,10 +151,13 @@ class Core<State> {
                 }
             }
         }
-        
+
         if ( args.emit ) {
             for ( const record of args.emit ) {
-                this._emit.set( record.when, record );
+                this._emit.set( record.when, new Set(
+                    Array.isArray( record.emit )
+                        ? record.emit
+                        : [ record.emit ] ) );
             }
         }
         if ( args.http ) {
@@ -202,10 +177,7 @@ class Core<State> {
         for ( const eventName of this._documentEvents.keys() ) {
             this._container.ownerDocument.addEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
         }
-        for ( const eventName of this._targetEvents.keys() ) {
-            this._targetEvents.get( eventName )!.target!.addEventListener( eventName, this._targetEventHandler, this._targetEvents.get( eventName )!.options || true )
-        }
-        
+
         if ( args.onResize ) {
             this._resizeUserHandler = args.onResize;
             this._resizeObserver = new ResizeObserver( this._resizeHandler );
@@ -217,7 +189,7 @@ class Core<State> {
         this._validation = args.validation;
         this._maybeValidate();
     }
-    
+
     public destructor() {
         for ( const eventName of this._localEvents.keys() ) {
             this._container.removeEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
@@ -227,9 +199,6 @@ class Core<State> {
         }
         for ( const eventName of this._documentEvents.keys() ) {
             this._container.ownerDocument.removeEventListener( eventName, this._documentEventHandler, this._documentEvents.get( eventName )!.options || true )
-        }
-        for ( const eventName of this._documentEvents.keys() ) {
-            this._targetEvents.get( eventName )!.target!.removeEventListener( eventName, this._targetEventHandler, this._targetEvents.get( eventName )!.options || true )
         }
         if ( this._resizeObserver ) {
             this._resizeObserver.unobserve( this._viewport );
@@ -259,12 +228,12 @@ class Core<State> {
             validity.tooShort !== ( flags.tooShort ?? false ) ||
             validity.typeMismatch !== ( flags.typeMismatch ?? false );
     }
-    
+
     private _resizeHandler( entries: ResizeObserverEntry[] ) {
         this._changeState(
-        //@ts-ignore
-        this._resizeUserHandler(
-        this._state, entries ) );
+            //@ts-ignore
+            this._resizeUserHandler(
+                this._state, entries ) );
     }
 
     private _handleEvent( event: Event, handler: EventHandler<State> ) {
@@ -277,12 +246,12 @@ class Core<State> {
             this._changeState( result as State );
         }
     }
-    
+
     private _localEventHandler( event: Event ) {
         if ( this._debug ) {
             console.log( "nikonov-components: local event catch", event );
         }
-        
+
         if ( [ "submit" ].includes( event.type ) ) {
             event.preventDefault();
         }
@@ -291,22 +260,6 @@ class Core<State> {
         this._handleEvent(
             event,
             this._localEvents.get(event.type)!.handler as EventHandler<State>
-        );
-    }
-
-    private _targetEventHandler( event: Event ) {
-        if ( this._debug ) {
-            console.log( "nikonov-components: local event catch", event );
-        }
-
-        if ( [ "submit" ].includes( event.type ) ) {
-            event.preventDefault();
-        }
-        event.stopImmediatePropagation();
-
-        this._handleEvent(
-            event,
-            this._targetEvents.get(event.type)!.handler as EventHandler<State>
         );
     }
 
@@ -329,7 +282,7 @@ class Core<State> {
             this._documentEvents.get(event.type)!.handler as EventHandler<State>
         );
     }
-    
+
     private _redraw() {
         const rendered = this._render( this._state );
         if ( this._debug ) {
@@ -390,22 +343,16 @@ class Core<State> {
         }
     }
 
-    private _dispatchEvent( event: Event, target?: EventTarget ) {
-        target = target ?? this._viewport;
-        target.dispatchEvent( event );
-
-        //@ts-ignore
-        const reactorEvent = new event.constructor( `${this._id}-${event.type}`, event );
-        window.dispatchEvent( reactorEvent );
+    private _dispatchEvent( event: Event ) {
+        this._viewport.dispatchEvent( event );
     }
 
     private _emitEvents( oldState: State ) {
-        for ( let [when, emitData] of this._emit ) {
+        for ( let [when, emitters] of this._emit ) {
             if ( when( oldState, this._state ) ) {
-                this._dispatchEvent(
-                    emitData.emit( this._state, oldState ),
-                    emitData.target
-                );
+                for ( let emitter of emitters ) {
+                    this._dispatchEvent( emitter( this._state, oldState ) );
+                }
             }
         }
     }
@@ -464,7 +411,7 @@ class Core<State> {
             }
         }
     }
-    
+
     private _changeState( newState: State ) {
         if ( this._state === newState ) {
             return;
@@ -498,7 +445,7 @@ const registry = new FinalizationRegistry( ( core: Core<any> ) => {
 
 class Reactor<State> {
     private _core: Core<State>;
-    
+
     private constructor( args: Args<State> ) {
         this._core = new Core( args );
         registry.register( this, this._core );
@@ -528,18 +475,6 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
     return stub;
 }
 
-const send = <T>( reactor: Reactor<T>, event: Event ): Reactor<T> => {
-    //@ts-ignore
-    reactor._core._container.dispatchEvent( event );
-    return reactor;
-}
-
-const clone = <T>( reactor: Reactor<T> ): Reactor<T> =>
-    make(
-        //@ts-ignore
-        reactor._core._args
-    );
 
 
-
-export { make, state, viewport, send, Reactor as Type, Args, clone };
+export { make, state, viewport, Reactor as Type, Args };
