@@ -2,7 +2,7 @@ import morphdom from "morphdom";
 import { v4 as uuidv4 } from 'uuid';
 
 type Render<State> = { ( s: State ): HTMLElement };
-type EventHandler<State> = { ( s: State, e: Event ): State };
+type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
     options?: AddEventListenerOptions
