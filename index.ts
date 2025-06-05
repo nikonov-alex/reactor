@@ -111,6 +111,9 @@ class Core<State> {
             }
         }
         this._debug = !!(args.debug);
+        if ( this._debug ) {
+            console.log( "nikonov-components: create reactor with options", args );
+        }
 
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._documentEventHandler = this._documentEventHandler.bind( this );
