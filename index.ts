@@ -9,7 +9,7 @@ type EventHandlerRecord<State> = {
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
         handler: EventHandler<State>,
-        target?: "local" | "window" | "document",
+        target?: "local" | "self" | "window" | "document",
         options?: AddEventListenerOptions
     } };
 
@@ -68,6 +68,7 @@ class Core<State> {
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _localEvents: Map<string, EventHandlerRecord<State>> = new Map();
+    private _selfEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _documentEvents: Map<string, EventHandlerRecord<State>> = new Map();
     private _debug: boolean;
     private _resizeObserver?: ResizeObserver;
@@ -118,6 +119,7 @@ class Core<State> {
         this._globalEventHandler = this._globalEventHandler.bind( this );
         this._documentEventHandler = this._documentEventHandler.bind( this );
         this._localEventHandler = this._localEventHandler.bind( this );
+        this._selfEventHandler = this._selfEventHandler.bind( this );
         this._resizeHandler = this._resizeHandler.bind( this );
 
         if ( args.events ) {
@@ -136,6 +138,13 @@ class Core<State> {
                                 handler: eventData.handler,
                                 options: eventData.options
                             } );
+                        }
+                        else if ( "self" === eventData.target ) {
+                            //@ts-ignore
+                            this._selfEvents.set(event, {
+                                handler: eventData.handler,
+                                options: eventData.options
+                            });
                         }
                         else if ( "window" === eventData.target ) {
                             //@ts-ignore
@@ -174,6 +183,9 @@ class Core<State> {
         for ( const eventName of this._localEvents.keys() ) {
             this._container.addEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
         }
+        for ( const eventName of this._selfEvents.keys() ) {
+            this._viewport.addEventListener( eventName, this._selfEventHandler, this._selfEvents.get( eventName )!.options || true )
+        }
         for ( const eventName of this._globalEvents.keys() ) {
             window.addEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
         }
@@ -196,6 +208,9 @@ class Core<State> {
     public destructor() {
         for ( const eventName of this._localEvents.keys() ) {
             this._container.removeEventListener( eventName, this._localEventHandler, this._localEvents.get( eventName )!.options || true )
+        }
+        for ( const eventName of this._selfEvents.keys() ) {
+            this._viewport.removeEventListener( eventName, this._selfEventHandler, this._selfEvents.get( eventName )!.options || true )
         }
         for ( const eventName of this._globalEvents.keys() ) {
             window.removeEventListener( eventName, this._globalEventHandler, this._globalEvents.get( eventName )!.options || true )
@@ -263,6 +278,22 @@ class Core<State> {
         this._handleEvent(
             event,
             this._localEvents.get(event.type)!.handler as EventHandler<State>
+        );
+    }
+
+    private _selfEventHandler( event: Event ) {
+        if ( this._debug ) {
+            console.log( "nikonov-components: self event catch", event );
+        }
+
+        if ( [ "submit" ].includes( event.type ) ) {
+            event.preventDefault();
+        }
+        event.stopImmediatePropagation();
+
+        this._handleEvent(
+            event,
+            this._selfEvents.get(event.type)!.handler as EventHandler<State>
         );
     }
 
