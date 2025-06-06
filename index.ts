@@ -21,8 +21,8 @@ type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
 type RequestResponse<State> = {
     request: RequestEmitter<State>,
-    response?: { ( s: State, response: Response, body: string ): State },
-    error?: { ( s: State, error: Error ): State },
+    response?: { ( s: State, response: Response, body: string ): State | [State, Event] },
+    error?: { ( s: State, error: Error ): State | [State, Event] },
     retry?: number
 };
 type RequestSettings<State> = RequestEmitter<State> | RequestResponse<State>;
@@ -254,8 +254,7 @@ class Core<State> {
                 this._state, entries ) );
     }
 
-    private _handleEvent( event: Event, handler: EventHandler<State> ) {
-        const result = handler( this._state, event );
+    private _handleResult( result: State | [State, Event] ) {
         if ( Array.isArray( result ) && 2 === result.length && result[1] instanceof Event ) {
             this._changeState( result[0] );
             this._dispatchEvent( result[1] );
@@ -263,6 +262,11 @@ class Core<State> {
         else {
             this._changeState( result as State );
         }
+    }
+
+    private _handleEvent( event: Event, handler: EventHandler<State> ) {
+        const result = handler( this._state, event );
+        this._handleResult( result );
     }
 
     private _localEventHandler( event: Event ) {
@@ -410,7 +414,7 @@ class Core<State> {
                     continue;
                 }
                 else if ( "error" in record && !!record.error ) {
-                    this._changeState( record.error( this._state, error as Error ) );
+                    this._handleResult( record.error( this._state, error as Error ) );
                 }
                 return;
             }
@@ -426,12 +430,12 @@ class Core<State> {
             }
             catch ( error ) {
                 if ( "error" in record && !!record.error ) {
-                    this._changeState( record.error( this._state, error as Error ) );
+                    this._handleResult( record.error( this._state, error as Error ) );
                 }
                 return;
             }
             if ( "response" in record && !!record.response ) {
-                this._changeState(record.response( this._state, response, body ));
+                this._handleResult(record.response( this._state, response, body ));
             }
         }
     }
