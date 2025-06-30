@@ -2,7 +2,7 @@ import morphdom from "morphdom";
 import { v4 as uuidv4 } from 'uuid';
 
 type Render<State> = { ( s: State ): HTMLElement };
-type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] };
+type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] | [State, [Event, ... Event[]]] };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
     options?: AddEventListenerOptions
@@ -21,7 +21,7 @@ type RequestPredicate<State> = { ( os: State | null, ns: State ): boolean };
 type RequestEmitter<State> = { ( s: State ): Request };
 type RequestResponse<State> = {
     request: RequestEmitter<State>,
-    response?: { ( s: State, response: Response, body: string ): State | [State, Event] },
+    response?: { ( s: State, response: Response, body: string ): State | [State, Event] | [State, [Event, ... Event[]]] },
     error?: { ( s: State, error: Error ): State | [State, Event] },
     retry?: number
 };
@@ -254,10 +254,16 @@ class Core<State> {
                 this._state, entries ) );
     }
 
-    private _handleResult( result: State | [State, Event] ) {
-        if ( Array.isArray( result ) && 2 === result.length && result[1] instanceof Event ) {
+    private _handleResult( result: State | [State, Event] | [State, [Event, ... Event[]]] ) {
+        if ( Array.isArray( result ) && 2 === result.length &&
+            ( result[1] instanceof Event || Array.isArray( result[1] ) && result[1][0] instanceof Event ) ) {
             this._changeState( result[0] );
-            this._dispatchEvent( result[1] );
+            const events = result[1] instanceof Event
+                ? [ result[1] ]
+                : result[1];
+            for ( const event of events ) {
+                this._dispatchEvent( event );
+            }
         }
         else {
             this._changeState( result as State );
