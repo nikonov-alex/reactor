@@ -388,7 +388,12 @@ class Core<State> {
     }
 
     private _dispatchEvent( event: Event ) {
-        this._viewport.dispatchEvent( event );
+        if ( this._viewport.isConnected ) {
+            this._viewport.dispatchEvent( event );
+        }
+        else {
+            window.dispatchEvent( event );
+        }
     }
 
     private _emitEvents( oldState: State ) {
