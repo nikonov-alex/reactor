@@ -1,7 +1,7 @@
 import morphdom from "morphdom";
 import { v4 as uuidv4 } from 'uuid';
 
-type Render<State> = { ( s: State ): HTMLElement };
+type Render<State> = { ( s: State ): HTMLElement | SVGElement };
 type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] | [State, [Event, ... Event[]]] };
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
@@ -44,7 +44,6 @@ type Validation<State> = {
 
 type Args<State> = {
     initialState: State,
-    render: Render<State>,
     events?: Events<State>,
     onResize?: ResizeHandler<State>,
     emit?: EmitRecord<State>[],
@@ -55,7 +54,10 @@ type Args<State> = {
     validation?: Validation<State>,
     dommode?: DOMMode,
     container?: HTMLElement
-};
+} & (
+    { render: Render<State> } |
+    { display: Render<State> }
+);
 
 class Core<State> {
     private _id: string;
@@ -63,7 +65,7 @@ class Core<State> {
     private _render: Render<State>;
     private _viewport: HTMLElement;
     private _container: HTMLElement;
-    private _root: HTMLElement;
+    private _root: HTMLElement | SVGElement;
     private _emit: Map<EmitPredicate<State>, Set<EventEmitter<State>>> = new Map();
     private _http: Map<RequestPredicate<State>, Set<RequestSettings<State>>> = new Map();
     private _globalEvents: Map<string, EventHandlerRecord<State>> = new Map();
@@ -81,7 +83,8 @@ class Core<State> {
     public constructor( args: Args<State> ) {
         this._id = uuidv4();
         this._state = args.initialState;
-        this._render = args.render;
+        this._render = "render" in args
+            ? args.render : args.display;
 
         this._viewport = document.createElement( "reactor-viewport" );
         this._viewport.classList.add( "viewport" );

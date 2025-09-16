@@ -1,6 +1,6 @@
 {
   "name": "@nikonov-alex/reactor",
-  "version": "0.0.59",
+  "version": "0.0.60",
   "description": "Reactor",
   "main": "./index.js",
   "types": "./index.ts",
