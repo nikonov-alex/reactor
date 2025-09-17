@@ -87,6 +87,8 @@ class Core<State> {
             ? args.render : args.display;
 
         this._viewport = document.createElement( "reactor-viewport" );
+        //@ts-ignore
+        this._viewport._reactor = this;
         this._viewport.classList.add( "viewport" );
         this._viewport.dataset.id = this._id;
         if ( args.id ) {
