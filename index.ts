@@ -87,8 +87,6 @@ class Core<State> {
             ? args.render : args.display;
 
         this._viewport = document.createElement( "reactor-viewport" );
-        //@ts-ignore
-        this._viewport._reactor = this;
         this._viewport.classList.add( "viewport" );
         this._viewport.dataset.id = this._id;
         if ( args.id ) {
@@ -502,6 +500,8 @@ class Reactor<State> {
 
     private constructor( args: Args<State> ) {
         this._core = new Core( args );
+        //@ts-ignore
+        this._core._viewport._reactor = this;
         registry.register( this, this._core );
     }
 }
