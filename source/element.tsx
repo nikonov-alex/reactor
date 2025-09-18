@@ -23,12 +23,16 @@ const handleEvent = <S extends JSX.Element>( handler: FunctionalHandler<S>, even
     if ( Array.isArray( result ) && 2 === result.length &&
         ( result[1] instanceof Event ) ) {
         const [ newState, event ] = result;
-        morphdom( oldState, newState );
+        if ( newState !== oldState ) {
+            morphdom( oldState, newState );
+        }
         container.dispatchEvent( event );
     }
     else {
         const newState = result as S;
-        morphdom( oldState, newState );
+        if ( newState !== oldState ) {
+            morphdom( oldState, newState );
+        }
     }
 }
 
