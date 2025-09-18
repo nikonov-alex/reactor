@@ -13,6 +13,8 @@ type Events<State> = { [name: string]: EventHandler<State> | {
         handler: EventHandler<State>,
         target?: "local" | "self" | "window" | "document",
         options?: AddEventListenerOptions
+        stopPropagation?: boolean,
+        preventDefault?: boolean
     } };
 
 type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
@@ -141,27 +143,35 @@ class Core<State> {
                         if ( !Object.hasOwn( eventData, "target" ) || "local" === eventData.target ) {
                             this._localEvents.set( event, {
                                 handler: eventData.handler,
-                                options: eventData.options
+                                options: eventData.options,
+                                stopPropagation: eventData.stopPropagation,
+                                preventDefault: eventData.preventDefault
                             } );
                         }
                         else if ( "self" === eventData.target ) {
                             //@ts-ignore
                             this._selfEvents.set(event, {
                                 handler: eventData.handler,
-                                options: eventData.options
+                                options: eventData.options,
+                                stopPropagation: eventData.stopPropagation,
+                                preventDefault: eventData.preventDefault
                             });
                         }
                         else if ( "window" === eventData.target ) {
                             //@ts-ignore
                             this._globalEvents.set(event, {
                                 handler: eventData.handler,
-                                options: eventData.options
+                                options: eventData.options,
+                                stopPropagation: eventData.stopPropagation,
+                                preventDefault: eventData.preventDefault
                             });
                         }
                         else {
                             this._documentEvents.set(event, {
                                 handler: eventData.handler,
-                                options: eventData.options
+                                options: eventData.options,
+                                stopPropagation: eventData.stopPropagation,
+                                preventDefault: eventData.preventDefault
                             });
                         }
                     }
