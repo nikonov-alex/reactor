@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "./",
+    "outDir": "./build/",
     "skipLibCheck": true,
     "module": "esnext",
     "moduleResolution": "node",
@@ -10,6 +10,8 @@
     "noImplicitThis": true,
     "alwaysStrict": true,
     "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx-dom",
     "sourceMap": true,
     "esModuleInterop": true,
     "importHelpers": true,
@@ -18,9 +20,10 @@
       "esnext",
       "dom"
     ],
-    "baseUrl": "${configDir}/"
+    "baseUrl": "${configDir}/build/"
   },
   "files": [
-    "${configDir}/index.ts"
+    "${configDir}/source/index.ts",
+    "${configDir}/source/cell.tsx"
   ]
 }

@@ -1,7 +1,10 @@
 const path = require('path');
 
 module.exports = {
-    entry: './index.ts',
+    entry: {
+        main: './source/index.ts',
+        cell: './source/cell.tsx'
+    },
     mode: 'production',
     devtool: false,
     module: {
@@ -17,7 +20,7 @@ module.exports = {
         extensions: ['.js', '.jsx', '.tsx', '.ts']
     },
     output: {
-        filename: 'index.js',
+        filename: 'build/[name].bundle.js',
         path: path.resolve( "./" ),
         library: {
             type: "module"
@@ -28,5 +31,8 @@ module.exports = {
     },
     optimization: {
         minimize: true
+    },
+    externals: {
+        "jsx-dom": "jsx-dom"
     }
 };

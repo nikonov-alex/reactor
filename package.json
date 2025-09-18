@@ -1,9 +1,9 @@
 {
   "name": "@nikonov-alex/reactor",
-  "version": "0.0.64",
+  "version": "0.0.65",
   "description": "Reactor",
-  "main": "./index.js",
-  "types": "./index.ts",
+  "main": "./build/main.bundle.js",
+  "types": "./source/index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@nikonov-alex/functional-library": "^0.0.31",
+    "jsx-dom": "^8.1.6",
     "morphdom": "^2.7.4",
     "uuid": "^11.0.2"
   }
