@@ -23,7 +23,6 @@
     "baseUrl": "${configDir}/build/"
   },
   "files": [
-    "${configDir}/source/index.ts",
-    "${configDir}/source/cell.tsx"
+    "${configDir}/source/index.ts"
   ]
 }

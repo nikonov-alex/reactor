@@ -1,9 +1,9 @@
 {
   "name": "@nikonov-alex/reactor",
-  "version": "0.0.65",
+  "version": "0.0.66",
   "description": "Reactor",
-  "main": "./build/main.bundle.js",
-  "types": "./source/index.ts",
+  "main": "./index.js",
+  "types": "./index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
