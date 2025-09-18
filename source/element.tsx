@@ -9,7 +9,7 @@ type ImperativeHandler = { ( event: Event ): void };
 
 
 type FunctionalEvents<S extends JSX.Element> = Partial<{
-    [event in keyof DOMAttributes<S>]: FunctionalHandler<S>
+    [event in keyof Omit<DOMAttributes<S>, "children">]: FunctionalHandler<S>
 }>;
 
 type ImperativeEvents<S extends JSX.Element, E extends FunctionalEvents<S>> = {
