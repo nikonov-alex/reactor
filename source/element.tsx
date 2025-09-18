@@ -53,4 +53,4 @@ const make = <S extends JSX.Element, FE extends FunctionalEvents<S>>(
         { children }
     </div>;
 
-export { make as Element };
+export { make as Element, FunctionalEvents as ElementEvents };
