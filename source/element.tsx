@@ -17,6 +17,9 @@ type ImperativeEvents<S extends JSX.Element, E extends FunctionalEvents<S>> = {
 };
 
 const handleEvent = <S extends JSX.Element>( handler: FunctionalHandler<S>, event: Event ) => {
+    if ( "submit" === event.type ) {
+        event.preventDefault();
+    }
     const container = event.target as HTMLElement;
     const oldState = container.children[0] as S;
     const result = handler( oldState, event );
