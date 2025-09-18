@@ -559,4 +559,5 @@ const viewport = <T>( reactor: Reactor<T> ): HTMLElement => {
 
 
 import * as Cell from "./cell";
-export { make, state, viewport, Reactor as Type, Args, Cell };
+import { Element } from "./element";
+export { make, state, viewport, Reactor as Type, Args, Cell, Element };
