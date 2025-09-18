@@ -6,6 +6,8 @@ type EventHandler<State> = { ( s: State, e: Event ): State | [State, Event] | [S
 type EventHandlerRecord<State> = {
     handler: EventHandler<State>,
     options?: AddEventListenerOptions
+    stopPropagation?: boolean,
+    preventDefault?: boolean
 }
 type Events<State> = { [name: string]: EventHandler<State> | {
         handler: EventHandler<State>,
@@ -282,16 +284,16 @@ class Core<State> {
         if ( this._debug ) {
             console.log( "nikonov-components: local event catch", event );
         }
+        const settings = this._localEvents.get(event.type) as EventHandlerRecord<State>;
 
-        if ( [ "submit" ].includes( event.type ) ) {
+        if ( settings.preventDefault || [ "submit" ].includes( event.type ) && settings.preventDefault !== false ) {
             event.preventDefault();
         }
-        event.stopImmediatePropagation();
+        if ( settings.stopPropagation !== false ) {
+            event.stopImmediatePropagation();
+        }
 
-        this._handleEvent(
-            event,
-            this._localEvents.get(event.type)!.handler as EventHandler<State>
-        );
+        this._handleEvent( event, settings.handler );
     }
 
     private _selfEventHandler( event: Event ) {
@@ -299,35 +301,50 @@ class Core<State> {
             console.log( "nikonov-components: self event catch", event );
         }
 
-        if ( [ "submit" ].includes( event.type ) ) {
+        const settings = this._selfEvents.get(event.type) as EventHandlerRecord<State>;
+
+        if ( settings.preventDefault || [ "submit" ].includes( event.type ) && settings.preventDefault !== false ) {
             event.preventDefault();
         }
-        event.stopImmediatePropagation();
+        if ( settings.stopPropagation !== false ) {
+            event.stopImmediatePropagation();
+        }
 
-        this._handleEvent(
-            event,
-            this._selfEvents.get(event.type)!.handler as EventHandler<State>
-        );
+        this._handleEvent( event, settings.handler );
     }
 
     private _globalEventHandler( event: Event ) {
         if ( this._debug ) {
             console.log( "nikonov-components: global event catch", event );
         }
-        this._handleEvent(
-            event,
-            this._globalEvents.get(event.type)!.handler as EventHandler<State>
-        );
+
+        const settings = this._globalEvents.get(event.type) as EventHandlerRecord<State>;
+
+        if ( settings.preventDefault ) {
+            event.preventDefault();
+        }
+        if ( settings.stopPropagation !== false ) {
+            event.stopImmediatePropagation();
+        }
+
+        this._handleEvent( event, settings.handler );
     }
 
     private _documentEventHandler( event: Event ) {
         if ( this._debug ) {
             console.log( "nikonov-components: document event catch", event );
         }
-        this._handleEvent(
-            event,
-            this._documentEvents.get(event.type)!.handler as EventHandler<State>
-        );
+
+        const settings = this._documentEvents.get(event.type) as EventHandlerRecord<State>;
+
+        if ( settings.preventDefault ) {
+            event.preventDefault();
+        }
+        if ( settings.stopPropagation !== false ) {
+            event.stopImmediatePropagation();
+        }
+
+        this._handleEvent( event, settings.handler );
     }
 
     private _redraw() {
