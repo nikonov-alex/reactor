@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "./build/",
+    "outDir": "./",
     "skipLibCheck": true,
     "module": "esnext",
     "moduleResolution": "node",
@@ -20,7 +20,7 @@
       "esnext",
       "dom"
     ],
-    "baseUrl": "${configDir}/build/"
+    "baseUrl": "${configDir}/"
   },
   "files": [
     "${configDir}/source/index.ts"
