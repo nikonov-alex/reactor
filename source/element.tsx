@@ -44,13 +44,13 @@ const map = <S extends JSX.Element, FE extends FunctionalEvents<S>>( events: FE 
     ) ) as ImperativeEvents<S, FE>;
 
 
-const make = <S extends JSX.Element, FE extends FunctionalEvents<S>>( props: {
-    initialState: S,
-    events: FE
-} ): JSX.Element =>
+const make = <S extends JSX.Element, FE extends FunctionalEvents<S>>(
+{ children, ... props }: {
+    children: S
+} & FE ): JSX.Element =>
     //@ts-ignore
-    <div { ... map<S, FE>( props.events ) }>
-        { props.initialState }
+    <div { ... map<S, FE>( props ) }>
+        { children }
     </div>;
 
 export { make as Element };
